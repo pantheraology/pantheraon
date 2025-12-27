@@ -1,25 +1,12 @@
-import { LayoutGrid, Compass, Heart, BookOpen, Trophy, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface SuggestionChip {
-  icon: LucideIcon;
-  label: string;
-  prompt: string;
-}
-
-const suggestions: SuggestionChip[] = [
-  { icon: LayoutGrid, label: 'Parenting', prompt: 'Give me some tips for better parenting' },
-  { icon: Compass, label: 'Current Events', prompt: 'What are the latest news and current events?' },
-  { icon: Heart, label: 'Health', prompt: 'Give me health and wellness advice' },
-  { icon: BookOpen, label: 'Research', prompt: 'Help me research a topic' },
-  { icon: Trophy, label: 'Sports', prompt: 'Tell me about recent sports news' },
-];
+import { defaultSuggestions, SuggestionChip } from '@/config/suggestions';
 
 interface SuggestionChipsProps {
   onSelect: (prompt: string) => void;
+  suggestions?: SuggestionChip[];
 }
 
-export const SuggestionChips = ({ onSelect }: SuggestionChipsProps) => {
+export const SuggestionChips = ({ onSelect, suggestions = defaultSuggestions }: SuggestionChipsProps) => {
   return (
     <div className="flex flex-wrap justify-center gap-3 w-full">
       {suggestions.map((suggestion) => {

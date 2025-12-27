@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { HelpCircle } from 'lucide-react';
-import { BackgroundEffects } from '@/components/BackgroundEffects';
 import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
@@ -45,7 +44,6 @@ const Index = () => {
 
   return (
     <div className="relative flex-1 h-screen flex flex-col">
-      <BackgroundEffects />
       <HeaderWidget onNewThread={handleNewThread} />
 
       {/* Main Content */}

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Message } from '@/components/MessageList';
+import { Message } from '@/types';
 import { toast } from 'sonner';
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
