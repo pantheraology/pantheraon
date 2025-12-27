@@ -1,12 +1,96 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useEffect, useCallback } from 'react';
+import { HelpCircle } from 'lucide-react';
+import { BackgroundEffects } from '@/components/BackgroundEffects';
+import { HeaderWidget } from '@/components/HeaderWidget';
+import { ChatInput } from '@/components/ChatInput';
+import { MessageList } from '@/components/MessageList';
+import { SuggestionChips } from '@/components/SuggestionChips';
+import { useChat } from '@/hooks/useChat';
+import { useConversations } from '@/hooks/useConversations';
 
 const Index = () => {
+  const { messages, isLoading, sendMessage, clearMessages } = useChat();
+  const { saveConversation } = useConversations();
+  const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
+  const [greeting, setGreeting] = useState('Good Evening');
+
+  // Set greeting based on time
+  useEffect(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) setGreeting('Good Morning');
+    else if (hour < 17) setGreeting('Good Afternoon');
+    else setGreeting('Good Evening');
+  }, []);
+
+  // Save conversation when messages change
+  useEffect(() => {
+    if (messages.length >= 2) {
+      const id = saveConversation(messages, currentConversationId);
+      if (!currentConversationId) {
+        setCurrentConversationId(id);
+      }
+    }
+  }, [messages, currentConversationId, saveConversation]);
+
+  const handleNewThread = useCallback(() => {
+    clearMessages();
+    setCurrentConversationId(undefined);
+  }, [clearMessages]);
+
+  const handleSuggestionSelect = useCallback((prompt: string) => {
+    sendMessage(prompt);
+  }, [sendMessage]);
+
+  const hasMessages = messages.length > 0;
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="relative flex-1 h-screen flex flex-col">
+      <BackgroundEffects />
+      <HeaderWidget onNewThread={handleNewThread} />
+
+      {/* Main Content */}
+      <div className="relative z-10 flex-1 flex flex-col items-center overflow-y-auto px-4 md:px-8">
+        {!hasMessages ? (
+          // Welcome State
+          <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[740px] gap-8 py-20">
+            <h1 className="text-4xl md:text-5xl font-light text-center text-foreground leading-tight drop-shadow-2xl animate-fade-in">
+              {greeting} <br />
+              <span className="text-muted-foreground">How Can I help you Today?</span>
+            </h1>
+
+            <div className="w-full animate-slide-up" style={{ animationDelay: '0.1s' }}>
+              <ChatInput 
+                onSend={sendMessage} 
+                isLoading={isLoading} 
+              />
+            </div>
+
+            <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
+              <SuggestionChips onSelect={handleSuggestionSelect} />
+            </div>
+          </div>
+        ) : (
+          // Chat State
+          <div className="flex-1 flex flex-col w-full max-w-[740px] pt-20 pb-4">
+            <div className="flex-1 overflow-y-auto">
+              <MessageList messages={messages} isLoading={isLoading} />
+            </div>
+            
+            <div className="sticky bottom-0 pt-4 bg-gradient-to-t from-background via-background to-transparent">
+              <ChatInput 
+                onSend={sendMessage} 
+                isLoading={isLoading}
+                placeholder="Continue the conversation..." 
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Floating Help Button */}
+      <button className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-b from-primary to-primary/60 shadow-lg flex items-center justify-center text-primary-foreground hover:scale-105 transition-transform z-20">
+        <HelpCircle size={24} />
+      </button>
     </div>
   );
 };
