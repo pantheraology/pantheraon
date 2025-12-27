@@ -1,13 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { User, Sparkles } from 'lucide-react';
-
-export interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp?: Date;
-}
+import { Message } from '@/types';
 
 interface MessageListProps {
   messages: Message[];

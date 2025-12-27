@@ -1,19 +1,17 @@
-import { Home, Compass, LayoutGrid, Library, Apple, Menu } from 'lucide-react';
+import { Apple, Menu } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-
-const navItems = [
-  { icon: Home, label: 'Home', path: '/' },
-  { icon: Compass, label: 'Discover', path: '/discover' },
-  { icon: LayoutGrid, label: 'Spaces', path: '/spaces' },
-  { icon: Library, label: 'Library', path: '/library' },
-];
+import { navItems } from '@/config/navigation';
+import { SIDEBAR_WIDTH } from '@/constants/layout';
 
 export const Sidebar = () => {
   const location = useLocation();
 
   return (
-    <div className="w-[260px] h-screen bg-sidebar flex flex-col justify-between py-6 px-4 fixed left-0 top-0 z-20 border-r border-border/50">
+    <div 
+      className="h-screen bg-sidebar flex flex-col justify-between py-6 px-4 fixed left-0 top-0 z-20 border-r border-border/50"
+      style={{ width: SIDEBAR_WIDTH }}
+    >
       {/* Top Section */}
       <div className="flex flex-col gap-6">
         {/* Brand */}

@@ -1,21 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Message } from '@/components/MessageList';
-
-export interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: Date;
-  updatedAt: Date;
-  spaceId?: string;
-}
-
-export interface Space {
-  id: string;
-  name: string;
-  icon?: string;
-  createdAt: Date;
-}
+import { Message, Conversation, Space } from '@/types';
 
 const CONVERSATIONS_KEY = 'ombrion-conversations';
 const SPACES_KEY = 'ombrion-spaces';
