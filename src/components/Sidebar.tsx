@@ -87,33 +87,34 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
           </div>
 
           {/* Auth Buttons or User Menu */}
-          {isLoaded && (
+          {!isLoaded ? (
+            <div className="animate-pulse space-y-3">
+              <div className="h-10 bg-muted/50 rounded-lg" />
+              <div className="h-10 bg-muted/50 rounded-lg" />
+            </div>
+          ) : isSignedIn ? (
+            <UserAccountMenu />
+          ) : (
             <>
-          {isSignedIn ? (
-                <UserAccountMenu />
-              ) : (
-                <>
-                  <button
-                    onClick={() => {
-                      navigate('/sign-up');
-                      handleNavClick();
-                    }}
-                    className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all"
-                  >
-                    Sign up
-                  </button>
+              <button
+                onClick={() => {
+                  navigate('/sign-up');
+                  handleNavClick();
+                }}
+                className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all"
+              >
+                Sign up
+              </button>
 
-                  <button
-                    onClick={() => {
-                      navigate('/sign-in');
-                      handleNavClick();
-                    }}
-                    className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all"
-                  >
-                    Log in
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => {
+                  navigate('/sign-in');
+                  handleNavClick();
+                }}
+                className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all"
+              >
+                Log in
+              </button>
             </>
           )}
         </div>
