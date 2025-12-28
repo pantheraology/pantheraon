@@ -4,12 +4,15 @@ import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
 import { SuggestionChips } from '@/components/SuggestionChips';
+import { AuthModal } from '@/components/AuthModal';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const Index = () => {
   const { messages, isLoading, sendMessage, clearMessages } = useChat();
   const { saveConversation } = useConversations();
+  const { isSignedIn, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const [greeting, setGreeting] = useState('Good Evening');
 
@@ -21,24 +24,32 @@ const Index = () => {
     else setGreeting('Good Evening');
   }, []);
 
-  // Save conversation when messages change
+  // Save conversation when messages change (only if signed in)
   useEffect(() => {
-    if (messages.length >= 2) {
+    if (isSignedIn && messages.length >= 2) {
       const id = saveConversation(messages, currentConversationId);
       if (!currentConversationId) {
         setCurrentConversationId(id);
       }
     }
-  }, [messages, currentConversationId, saveConversation]);
+  }, [messages, currentConversationId, saveConversation, isSignedIn]);
 
   const handleNewThread = useCallback(() => {
     clearMessages();
     setCurrentConversationId(undefined);
   }, [clearMessages]);
 
+  const handleSendMessage = useCallback((content: string) => {
+    requireAuth(() => {
+      sendMessage(content);
+    });
+  }, [requireAuth, sendMessage]);
+
   const handleSuggestionSelect = useCallback((prompt: string) => {
-    sendMessage(prompt);
-  }, [sendMessage]);
+    requireAuth(() => {
+      sendMessage(prompt);
+    });
+  }, [requireAuth, sendMessage]);
 
   const hasMessages = messages.length > 0;
 
@@ -58,7 +69,7 @@ const Index = () => {
 
             <div className="w-full animate-slide-up" style={{ animationDelay: '0.1s' }}>
               <ChatInput 
-                onSend={sendMessage} 
+                onSend={handleSendMessage} 
                 isLoading={isLoading} 
               />
             </div>
@@ -76,7 +87,7 @@ const Index = () => {
             
             <div className="sticky bottom-0 pt-4 bg-gradient-to-t from-background via-background to-transparent">
               <ChatInput 
-                onSend={sendMessage} 
+                onSend={handleSendMessage} 
                 isLoading={isLoading}
                 placeholder="Continue the conversation..." 
               />
@@ -89,6 +100,13 @@ const Index = () => {
       <button className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-b from-primary to-primary/60 shadow-lg flex items-center justify-center text-primary-foreground hover:scale-105 transition-transform z-20">
         <HelpCircle size={24} />
       </button>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={closeAuthModal}
+        message="Sign in to send messages and save your conversations."
+      />
     </div>
   );
 };
