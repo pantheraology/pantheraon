@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import { Sidebar } from "@/components/Sidebar";
 import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { BackgroundEffects } from "@/components/BackgroundEffects";
@@ -54,11 +54,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <ErrorBoundary>
-          <AppContent />
-        </ErrorBoundary>
-      </BrowserRouter>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </TooltipProvider>
   </QueryClientProvider>
 );
