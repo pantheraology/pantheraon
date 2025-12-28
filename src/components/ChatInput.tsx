@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Paperclip, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
@@ -49,12 +49,8 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
           className="w-full bg-transparent text-foreground text-lg placeholder:text-muted-foreground/50 focus:outline-none px-2 py-4 font-light resize-none min-h-[60px] max-h-[150px]"
         />
         
-        {/* Input Actions */}
         <div className="flex items-center justify-between mt-2 border-t border-border pt-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors text-sm">
-            <Paperclip size={16} />
-            <span>Attach</span>
-          </button>
+          <div /> {/* Placeholder for future attachment feature */}
 
           <button 
             onClick={handleSubmit}

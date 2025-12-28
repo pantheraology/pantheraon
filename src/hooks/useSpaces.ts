@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { Space } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
-
-const SPACES_KEY = 'pantheraon-spaces';
+import { STORAGE_KEYS } from '@/config/storage';
+import { parseStoredDate, toStoredDate } from '@/lib/utils';
 
 interface StoredSpace {
   id: string;
@@ -12,12 +12,12 @@ interface StoredSpace {
 }
 
 export const useSpaces = () => {
-  const [storedSpaces, setStoredSpaces] = useLocalStorage<StoredSpace[]>(SPACES_KEY, []);
+  const [storedSpaces, setStoredSpaces] = useLocalStorage<StoredSpace[]>(STORAGE_KEYS.SPACES, []);
 
   // Parse dates from stored format
   const spaces: Space[] = storedSpaces.map((s) => ({
     ...s,
-    createdAt: new Date(s.createdAt),
+    createdAt: parseStoredDate(s.createdAt),
   }));
 
   const createSpace = useCallback((name: string): Space => {
@@ -29,7 +29,7 @@ export const useSpaces = () => {
     
     setStoredSpaces((prev) => [
       ...prev,
-      { ...newSpace, createdAt: newSpace.createdAt.toISOString() },
+      { ...newSpace, createdAt: toStoredDate(newSpace.createdAt) },
     ]);
     
     return newSpace;

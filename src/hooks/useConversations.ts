@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { Message, Conversation } from '@/types';
 import { useLocalStorage } from './useLocalStorage';
 import { useSpaces } from './useSpaces';
-
-const CONVERSATIONS_KEY = 'pantheraon-conversations';
+import { STORAGE_KEYS } from '@/config/storage';
+import { parseStoredDate, toStoredDate } from '@/lib/utils';
 
 interface StoredConversation {
   id: string;
@@ -21,7 +21,7 @@ interface StoredConversation {
 
 export const useConversations = () => {
   const [storedConversations, setStoredConversations] = useLocalStorage<StoredConversation[]>(
-    CONVERSATIONS_KEY,
+    STORAGE_KEYS.CONVERSATIONS,
     []
   );
   
@@ -31,11 +31,11 @@ export const useConversations = () => {
   // Parse dates from stored format
   const conversations: Conversation[] = storedConversations.map((c) => ({
     ...c,
-    createdAt: new Date(c.createdAt),
-    updatedAt: new Date(c.updatedAt),
+    createdAt: parseStoredDate(c.createdAt),
+    updatedAt: parseStoredDate(c.updatedAt),
     messages: c.messages.map((m) => ({
       ...m,
-      timestamp: m.timestamp ? new Date(m.timestamp) : undefined,
+      timestamp: m.timestamp ? parseStoredDate(m.timestamp) : undefined,
     })),
   }));
 
@@ -52,9 +52,9 @@ export const useConversations = () => {
                   ...c,
                   messages: messages.map((m) => ({
                     ...m,
-                    timestamp: m.timestamp?.toISOString(),
+                    timestamp: m.timestamp ? toStoredDate(m.timestamp) : undefined,
                   })),
-                  updatedAt: now.toISOString(),
+                  updatedAt: toStoredDate(now),
                   title,
                 }
               : c
@@ -69,10 +69,10 @@ export const useConversations = () => {
         title,
         messages: messages.map((m) => ({
           ...m,
-          timestamp: m.timestamp?.toISOString(),
+          timestamp: m.timestamp ? toStoredDate(m.timestamp) : undefined,
         })),
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
+        createdAt: toStoredDate(now),
+        updatedAt: toStoredDate(now),
       };
 
       setStoredConversations((prev) => [newConversation, ...prev]);
