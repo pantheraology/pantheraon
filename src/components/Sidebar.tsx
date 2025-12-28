@@ -1,4 +1,4 @@
-import { Apple } from 'lucide-react';
+
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, UserButton } from '@clerk/clerk-react';
 import { cn } from '@/lib/utils';
@@ -126,12 +126,6 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
               )}
             </>
           )}
-
-          {/* Download */}
-          <div className="flex items-center justify-center gap-2 mt-2 cursor-pointer opacity-60 hover:opacity-100 transition-opacity">
-            <Apple size={16} className="text-foreground" />
-            <span className="text-foreground text-sm font-medium">Download for Mac</span>
-          </div>
         </div>
       </div>
     </>
