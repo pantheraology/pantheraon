@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MessageSquare, Search, LogIn } from 'lucide-react';
-import { useAuth } from '@clerk/clerk-react';
+import { Search, MessageSquare } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { ConversationCard } from '@/components/cards/ConversationCard';
+import { AuthPrompt } from '@/components/common/AuthPrompt';
+import { EmptyState } from '@/components/common/EmptyState';
 
 const Library = () => {
   const { conversations, deleteConversation } = useConversations();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded } = useAuthGuard();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredConversations = conversations.filter(c =>
@@ -24,21 +25,10 @@ const Library = () => {
             <p className="text-muted-foreground">Your conversation history</p>
           </div>
 
-          <div className="glass rounded-xl p-12 text-center">
-            <LogIn size={48} className="mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Sign in to see your library
-            </h3>
-            <p className="text-muted-foreground mb-4">
-              Your conversation history will be saved and accessible across devices
-            </p>
-            <Link 
-              to="/sign-in"
-              className="inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
-            >
-              Sign In
-            </Link>
-          </div>
+          <AuthPrompt
+            title="Sign in to see your library"
+            description="Your conversation history will be saved and accessible across devices"
+          />
         </div>
       </div>
     );
@@ -68,26 +58,17 @@ const Library = () => {
         {/* Conversations List */}
         <div className="space-y-3">
           {filteredConversations.length === 0 ? (
-            <div className="glass rounded-xl p-12 text-center">
-              <MessageSquare size={48} className="mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                {searchQuery ? 'No matching conversations' : 'No conversations yet'}
-              </h3>
-              <p className="text-muted-foreground mb-4">
-                {searchQuery 
+            <EmptyState
+              icon={MessageSquare}
+              title={searchQuery ? 'No matching conversations' : 'No conversations yet'}
+              description={
+                searchQuery
                   ? 'Try a different search term'
                   : 'Start a new conversation to see it here'
-                }
-              </p>
-              {!searchQuery && (
-                <Link 
-                  to="/"
-                  className="inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
-                >
-                  Start Chatting
-                </Link>
-              )}
-            </div>
+              }
+              actionLabel={searchQuery ? undefined : 'Start Chatting'}
+              actionPath={searchQuery ? undefined : '/'}
+            />
           ) : (
             filteredConversations.map((conversation) => (
               <ConversationCard 

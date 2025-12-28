@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, Info, Paperclip, Send, ChevronDown } from 'lucide-react';
+import { Paperclip, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
@@ -10,7 +10,6 @@ interface ChatInputProps {
 
 export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anything..." }: ChatInputProps) => {
   const [input, setInput] = useState('');
-  const [activeTab, setActiveTab] = useState<'search' | 'research'>('search');
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
@@ -37,47 +36,6 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
 
   return (
     <div className="w-full glass rounded-2xl p-4 flex flex-col gap-4 shadow-2xl">
-      {/* Tabs */}
-      <div className="flex justify-between items-center px-2">
-        <div className="bg-secondary rounded-lg p-1 flex items-center">
-          <button 
-            onClick={() => setActiveTab('search')}
-            className={cn(
-              "flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-              activeTab === 'search' 
-                ? "bg-gradient-to-b from-primary to-primary/60 text-primary-foreground border border-border" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Search size={14} />
-            Search
-          </button>
-          <button 
-            onClick={() => setActiveTab('research')}
-            className={cn(
-              "flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-              activeTab === 'research' 
-                ? "bg-gradient-to-b from-primary to-primary/60 text-primary-foreground border border-border" 
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Info size={14} />
-            Research
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="bg-secondary rounded-full px-3 py-1.5 flex items-center gap-2 cursor-pointer hover:bg-muted border border-border">
-            <div className="flex gap-1">
-              <div className="w-1 h-1 rounded-full bg-foreground/80" />
-              <div className="w-1 h-1 rounded-full bg-foreground/60" />
-              <div className="w-1 h-1 rounded-full bg-foreground/40" />
-            </div>
-            <ChevronDown size={14} className="text-muted-foreground" />
-          </div>
-        </div>
-      </div>
-
       {/* Input Area */}
       <div className="relative">
         <textarea 

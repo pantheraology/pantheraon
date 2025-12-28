@@ -1,130 +1,129 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Message, Conversation, Space } from '@/types';
+import { useState, useCallback } from 'react';
+import { Message, Conversation } from '@/types';
+import { useLocalStorage } from './useLocalStorage';
+import { useSpaces } from './useSpaces';
 
 const CONVERSATIONS_KEY = 'pantheraon-conversations';
-const SPACES_KEY = 'pantheraon-spaces';
+
+interface StoredConversation {
+  id: string;
+  title: string;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+  spaceId?: string;
+}
 
 export const useConversations = () => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [storedConversations, setStoredConversations] = useLocalStorage<StoredConversation[]>(
+    CONVERSATIONS_KEY,
+    []
+  );
+  
+  // Re-export spaces functionality for backward compatibility
+  const { spaces, createSpace, deleteSpace: deleteSpaceBase, getSpace } = useSpaces();
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(CONVERSATIONS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setConversations(parsed.map((c: any) => ({
-          ...c,
-          createdAt: new Date(c.createdAt),
-          updatedAt: new Date(c.updatedAt),
-          messages: c.messages.map((m: any) => ({
-            ...m,
-            timestamp: m.timestamp ? new Date(m.timestamp) : undefined,
-          })),
-        })));
+  // Parse dates from stored format
+  const conversations: Conversation[] = storedConversations.map((c) => ({
+    ...c,
+    createdAt: new Date(c.createdAt),
+    updatedAt: new Date(c.updatedAt),
+    messages: c.messages.map((m) => ({
+      ...m,
+      timestamp: m.timestamp ? new Date(m.timestamp) : undefined,
+    })),
+  }));
+
+  const saveConversation = useCallback(
+    (messages: Message[], existingId?: string): string => {
+      const now = new Date();
+      const title = messages[0]?.content.slice(0, 50) || 'New Conversation';
+
+      if (existingId) {
+        setStoredConversations((prev) =>
+          prev.map((c) =>
+            c.id === existingId
+              ? {
+                  ...c,
+                  messages: messages.map((m) => ({
+                    ...m,
+                    timestamp: m.timestamp?.toISOString(),
+                  })),
+                  updatedAt: now.toISOString(),
+                  title,
+                }
+              : c
+          )
+        );
+        return existingId;
       }
 
-      const savedSpaces = localStorage.getItem(SPACES_KEY);
-      if (savedSpaces) {
-        const parsed = JSON.parse(savedSpaces);
-        setSpaces(parsed.map((s: any) => ({
-          ...s,
-          createdAt: new Date(s.createdAt),
-        })));
-      }
-    } catch (error) {
-      console.error('Failed to load conversations:', error);
-    }
-  }, []);
+      const newId = crypto.randomUUID();
+      const newConversation: StoredConversation = {
+        id: newId,
+        title,
+        messages: messages.map((m) => ({
+          ...m,
+          timestamp: m.timestamp?.toISOString(),
+        })),
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
 
-  // Save to localStorage when conversations change
-  useEffect(() => {
-    try {
-      localStorage.setItem(CONVERSATIONS_KEY, JSON.stringify(conversations));
-    } catch (error) {
-      console.error('Failed to save conversations:', error);
-    }
-  }, [conversations]);
+      setStoredConversations((prev) => [newConversation, ...prev]);
+      return newId;
+    },
+    [setStoredConversations]
+  );
 
-  // Save spaces to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem(SPACES_KEY, JSON.stringify(spaces));
-    } catch (error) {
-      console.error('Failed to save spaces:', error);
-    }
-  }, [spaces]);
+  const deleteConversation = useCallback(
+    (id: string) => {
+      setStoredConversations((prev) => prev.filter((c) => c.id !== id));
+    },
+    [setStoredConversations]
+  );
 
-  const saveConversation = useCallback((messages: Message[], existingId?: string) => {
-    const now = new Date();
-    const title = messages[0]?.content.slice(0, 50) || 'New Conversation';
-    
-    if (existingId) {
-      setConversations(prev => 
-        prev.map(c => 
-          c.id === existingId 
-            ? { ...c, messages, updatedAt: now, title }
-            : c
-        )
+  const getConversation = useCallback(
+    (id: string): Conversation | undefined => {
+      return conversations.find((c) => c.id === id);
+    },
+    [conversations]
+  );
+
+  const deleteSpace = useCallback(
+    (id: string) => {
+      deleteSpaceBase(id);
+      // Remove space association from conversations
+      setStoredConversations((prev) =>
+        prev.map((c) => (c.spaceId === id ? { ...c, spaceId: undefined } : c))
       );
-      return existingId;
-    }
+    },
+    [deleteSpaceBase, setStoredConversations]
+  );
 
-    const newConversation: Conversation = {
-      id: crypto.randomUUID(),
-      title,
-      messages,
-      createdAt: now,
-      updatedAt: now,
-    };
+  const moveToSpace = useCallback(
+    (conversationId: string, spaceId: string | undefined) => {
+      setStoredConversations((prev) =>
+        prev.map((c) => (c.id === conversationId ? { ...c, spaceId } : c))
+      );
+    },
+    [setStoredConversations]
+  );
 
-    setConversations(prev => [newConversation, ...prev]);
-    return newConversation.id;
-  }, []);
-
-  const deleteConversation = useCallback((id: string) => {
-    setConversations(prev => prev.filter(c => c.id !== id));
-  }, []);
-
-  const getConversation = useCallback((id: string) => {
-    return conversations.find(c => c.id === id);
-  }, [conversations]);
-
-  const createSpace = useCallback((name: string) => {
-    const newSpace: Space = {
-      id: crypto.randomUUID(),
-      name,
-      createdAt: new Date(),
-    };
-    setSpaces(prev => [...prev, newSpace]);
-    return newSpace;
-  }, []);
-
-  const deleteSpace = useCallback((id: string) => {
-    setSpaces(prev => prev.filter(s => s.id !== id));
-    // Remove space association from conversations
-    setConversations(prev => 
-      prev.map(c => 
-        c.spaceId === id ? { ...c, spaceId: undefined } : c
-      )
-    );
-  }, []);
-
-  const moveToSpace = useCallback((conversationId: string, spaceId: string | undefined) => {
-    setConversations(prev =>
-      prev.map(c =>
-        c.id === conversationId ? { ...c, spaceId } : c
-      )
-    );
-  }, []);
-
-  const getConversationsBySpace = useCallback((spaceId: string | undefined) => {
-    if (spaceId === undefined) {
-      return conversations.filter(c => !c.spaceId);
-    }
-    return conversations.filter(c => c.spaceId === spaceId);
-  }, [conversations]);
+  const getConversationsBySpace = useCallback(
+    (spaceId: string | undefined): Conversation[] => {
+      if (spaceId === undefined) {
+        return conversations.filter((c) => !c.spaceId);
+      }
+      return conversations.filter((c) => c.spaceId === spaceId);
+    },
+    [conversations]
+  );
 
   return {
     conversations,

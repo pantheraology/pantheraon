@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { HelpCircle } from 'lucide-react';
 import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
@@ -95,11 +94,6 @@ const Index = () => {
           </div>
         )}
       </div>
-
-      {/* Floating Help Button */}
-      <button className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-gradient-to-b from-primary to-primary/60 shadow-lg flex items-center justify-center text-primary-foreground hover:scale-105 transition-transform z-20">
-        <HelpCircle size={24} />
-      </button>
 
       {/* Auth Modal */}
       <AuthModal 

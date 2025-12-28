@@ -3,6 +3,8 @@ import { Plus, FolderOpen } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { SpaceCard } from '@/components/cards/SpaceCard';
 import { AuthModal } from '@/components/AuthModal';
+import { AuthPrompt } from '@/components/common/AuthPrompt';
+import { EmptyState } from '@/components/common/EmptyState';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const Spaces = () => {
@@ -46,17 +48,10 @@ const Spaces = () => {
 
         {/* Sign in prompt for non-authenticated users */}
         {!isSignedIn && (
-          <div className="glass rounded-xl p-6 mb-6 text-center">
-            <p className="text-muted-foreground mb-3">
-              Sign in to create and manage your spaces
-            </p>
-            <button
-              onClick={handleNewSpaceClick}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
-            >
-              Sign In
-            </button>
-          </div>
+          <AuthPrompt
+            title="Sign in to manage spaces"
+            description="Sign in to create and manage your spaces"
+          />
         )}
 
         {/* New Space Form */}
@@ -92,16 +87,14 @@ const Spaces = () => {
         {isSignedIn && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {spaces.length === 0 && !showNewSpace ? (
-              <div className="col-span-full glass rounded-xl p-12 text-center">
-                <FolderOpen size={48} className="mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No spaces yet</h3>
-                <p className="text-muted-foreground mb-4">Create your first space to organize conversations</p>
-                <button 
-                  onClick={() => setShowNewSpace(true)}
-                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
-                >
-                  Create Space
-                </button>
+              <div className="col-span-full">
+                <EmptyState
+                  icon={FolderOpen}
+                  title="No spaces yet"
+                  description="Create your first space to organize conversations"
+                  actionLabel="Create Space"
+                  onAction={() => setShowNewSpace(true)}
+                />
               </div>
             ) : (
               spaces.map((space) => {
