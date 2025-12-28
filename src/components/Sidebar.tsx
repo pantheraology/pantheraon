@@ -4,6 +4,7 @@ import { useAuth, UserButton } from '@clerk/clerk-react';
 import { cn } from '@/lib/utils';
 import { navItems } from '@/config/navigation';
 import { SIDEBAR_WIDTH } from '@/constants/layout';
+import { BRAND } from '@/config/brand';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -48,7 +49,7 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
             <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-primary/80 via-primary to-primary/60 shadow-[0_0_38px_hsl(var(--primary)/0.45)] flex items-center justify-center text-foreground font-bold">
               P
             </div>
-            <span className="text-foreground font-medium text-lg tracking-wide">PantheraON</span>
+            <span className="text-foreground font-medium text-lg tracking-wide">{BRAND.APP_NAME}</span>
           </div>
 
           {/* Navigation */}
@@ -81,7 +82,7 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
         <div className="flex flex-col gap-4">
           {/* Info */}
           <div className="px-2">
-            <p className="text-muted-foreground text-sm mb-4">Powered by Lovable AI</p>
+            <p className="text-muted-foreground text-sm mb-4">{BRAND.TAGLINE}</p>
           </div>
 
           {/* Auth Buttons or User Menu */}

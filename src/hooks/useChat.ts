@@ -1,8 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Message } from '@/types';
 import { toast } from 'sonner';
-
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+import { getChatUrl, getSupabaseKey } from '@/lib/api';
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -22,11 +21,11 @@ export const useChat = () => {
     let assistantContent = '';
 
     try {
-      const resp = await fetch(CHAT_URL, {
+      const resp = await fetch(getChatUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${getSupabaseKey()}`,
         },
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({
@@ -92,9 +91,9 @@ export const useChat = () => {
 
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
+            const chunkContent = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (chunkContent) {
+              assistantContent += chunkContent;
               setMessages(prev => 
                 prev.map(m => 
                   m.id === assistantId 
@@ -122,9 +121,9 @@ export const useChat = () => {
           if (jsonStr === '[DONE]') continue;
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (content) {
-              assistantContent += content;
+            const chunkContent = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (chunkContent) {
+              assistantContent += chunkContent;
             }
           } catch { /* ignore */ }
         }
