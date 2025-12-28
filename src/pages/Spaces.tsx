@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Plus, FolderOpen } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { SpaceCard } from '@/components/cards/SpaceCard';
+import { AuthModal } from '@/components/AuthModal';
+import { useAuthGuard } from '@/hooks/useAuthGuard';
 
 const Spaces = () => {
   const { spaces, createSpace, deleteSpace, getConversationsBySpace } = useConversations();
+  const { isSignedIn, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const [newSpaceName, setNewSpaceName] = useState('');
   const [showNewSpace, setShowNewSpace] = useState(false);
 
@@ -14,6 +17,12 @@ const Spaces = () => {
       setNewSpaceName('');
       setShowNewSpace(false);
     }
+  };
+
+  const handleNewSpaceClick = () => {
+    requireAuth(() => {
+      setShowNewSpace(true);
+    });
   };
 
   return (
@@ -27,7 +36,7 @@ const Spaces = () => {
           </div>
           
           <button 
-            onClick={() => setShowNewSpace(true)}
+            onClick={handleNewSpaceClick}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium hover:brightness-110 transition-all"
           >
             <Plus size={18} />
@@ -35,8 +44,23 @@ const Spaces = () => {
           </button>
         </div>
 
+        {/* Sign in prompt for non-authenticated users */}
+        {!isSignedIn && (
+          <div className="glass rounded-xl p-6 mb-6 text-center">
+            <p className="text-muted-foreground mb-3">
+              Sign in to create and manage your spaces
+            </p>
+            <button
+              onClick={handleNewSpaceClick}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
+            >
+              Sign In
+            </button>
+          </div>
+        )}
+
         {/* New Space Form */}
-        {showNewSpace && (
+        {showNewSpace && isSignedIn && (
           <div className="glass rounded-xl p-4 mb-6 animate-fade-in">
             <div className="flex gap-3">
               <input
@@ -65,34 +89,43 @@ const Spaces = () => {
         )}
 
         {/* Spaces Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {spaces.length === 0 && !showNewSpace ? (
-            <div className="col-span-full glass rounded-xl p-12 text-center">
-              <FolderOpen size={48} className="mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">No spaces yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first space to organize conversations</p>
-              <button 
-                onClick={() => setShowNewSpace(true)}
-                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
-              >
-                Create Space
-              </button>
-            </div>
-          ) : (
-            spaces.map((space) => {
-              const spaceConversations = getConversationsBySpace(space.id);
-              return (
-                <SpaceCard 
-                  key={space.id} 
-                  space={space} 
-                  conversationCount={spaceConversations.length}
-                  onDelete={() => deleteSpace(space.id)}
-                />
-              );
-            })
-          )}
-        </div>
+        {isSignedIn && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {spaces.length === 0 && !showNewSpace ? (
+              <div className="col-span-full glass rounded-xl p-12 text-center">
+                <FolderOpen size={48} className="mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">No spaces yet</h3>
+                <p className="text-muted-foreground mb-4">Create your first space to organize conversations</p>
+                <button 
+                  onClick={() => setShowNewSpace(true)}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
+                >
+                  Create Space
+                </button>
+              </div>
+            ) : (
+              spaces.map((space) => {
+                const spaceConversations = getConversationsBySpace(space.id);
+                return (
+                  <SpaceCard 
+                    key={space.id} 
+                    space={space} 
+                    conversationCount={spaceConversations.length}
+                    onDelete={() => deleteSpace(space.id)}
+                  />
+                );
+              })
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={closeAuthModal}
+        message="Sign in to create and manage your spaces."
+      />
     </div>
   );
 };

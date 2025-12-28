@@ -1,17 +1,48 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageSquare, Search } from 'lucide-react';
+import { MessageSquare, Search, LogIn } from 'lucide-react';
+import { useAuth } from '@clerk/clerk-react';
 import { useConversations } from '@/hooks/useConversations';
 import { ConversationCard } from '@/components/cards/ConversationCard';
 
 const Library = () => {
   const { conversations, deleteConversation } = useConversations();
+  const { isSignedIn, isLoaded } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredConversations = conversations.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  if (isLoaded && !isSignedIn) {
+    return (
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 md:px-10 py-10">
+        <div className="max-w-4xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-3xl font-light text-foreground mb-2">Library</h1>
+            <p className="text-muted-foreground">Your conversation history</p>
+          </div>
+
+          <div className="glass rounded-xl p-12 text-center">
+            <LogIn size={48} className="mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">
+              Sign in to see your library
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              Your conversation history will be saved and accessible across devices
+            </p>
+            <Link 
+              to="/sign-in"
+              className="inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative z-10 flex-1 overflow-y-auto px-6 md:px-10 py-10">

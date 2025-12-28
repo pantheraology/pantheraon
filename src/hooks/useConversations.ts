@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Message, Conversation, Space } from '@/types';
 
-const CONVERSATIONS_KEY = 'ombrion-conversations';
-const SPACES_KEY = 'ombrion-spaces';
+const CONVERSATIONS_KEY = 'pantheraon-conversations';
+const SPACES_KEY = 'pantheraon-spaces';
 
 export const useConversations = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
