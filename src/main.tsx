@@ -1,11 +1,30 @@
 import { createRoot } from 'react-dom/client';
 import { useEffect, useState } from 'react';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
 import App from './App.tsx';
 import { BootstrapLoader } from './components/BootstrapLoader';
 import { clerkAppearance } from './config/clerk';
 import { resolveClerkPublishableKey } from './lib/config';
 import './index.css';
+
+function ClerkProviderWithRoutes({ clerkKey }: { clerkKey: string }) {
+  const navigate = useNavigate();
+
+  return (
+    <ClerkProvider 
+      publishableKey={clerkKey} 
+      appearance={clerkAppearance} 
+      afterSignOutUrl="/"
+      routerPush={(to) => navigate(to)}
+      routerReplace={(to) => navigate(to, { replace: true })}
+      signInUrl="https://accounts.panthera.ai/sign-in"
+      signUpUrl="https://accounts.panthera.ai/sign-up"
+    >
+      <App />
+    </ClerkProvider>
+  );
+}
 
 function Bootstrap() {
   const [clerkKey, setClerkKey] = useState<string | null>(null);
@@ -36,9 +55,9 @@ function Bootstrap() {
   }
 
   return (
-    <ClerkProvider publishableKey={clerkKey} appearance={clerkAppearance} afterSignOutUrl="/">
-      <App />
-    </ClerkProvider>
+    <BrowserRouter>
+      <ClerkProviderWithRoutes clerkKey={clerkKey} />
+    </BrowserRouter>
   );
 }
 

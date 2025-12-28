@@ -96,25 +96,21 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
             <UserAccountMenu />
           ) : (
             <>
-              <button
-                onClick={() => {
-                  navigate('/sign-up');
-                  handleNavClick();
-                }}
-                className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all"
+              <a
+                href="https://accounts.panthera.ai/sign-up"
+                onClick={handleNavClick}
+                className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all text-center block"
               >
                 Sign up
-              </button>
+              </a>
 
-              <button
-                onClick={() => {
-                  navigate('/sign-in');
-                  handleNavClick();
-                }}
-                className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all"
+              <a
+                href="https://accounts.panthera.ai/sign-in"
+                onClick={handleNavClick}
+                className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all text-center block"
               >
                 Log in
-              </button>
+              </a>
             </>
           )}
         </div>

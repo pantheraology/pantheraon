@@ -38,26 +38,32 @@ export const UserAccountMenu = () => {
       <PopoverContent 
         side="top" 
         align="start" 
-        className="w-48 p-1.5 bg-popover border-border"
+        className="w-52 p-2 bg-[hsl(240_10%_10%)] border-border/50 rounded-xl shadow-xl"
       >
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col">
           <button
             onClick={() => navigate('/settings')}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted/50 transition-colors w-full text-left"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted/30 transition-colors w-full text-left"
           >
             <Settings size={16} className="text-muted-foreground" />
             Settings
           </button>
+          
+          <div className="h-px bg-border/50 my-1 mx-2" />
+          
           <button
             onClick={() => navigate('/archived')}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted/50 transition-colors w-full text-left"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted/30 transition-colors w-full text-left"
           >
             <Archive size={16} className="text-muted-foreground" />
             Archived Chats
           </button>
+          
+          <div className="h-px bg-border/50 my-1 mx-2" />
+          
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-foreground hover:bg-muted/50 transition-colors w-full text-left"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-foreground hover:bg-muted/30 transition-colors w-full text-left"
           >
             <LogOut size={16} className="text-muted-foreground" />
             Log out
