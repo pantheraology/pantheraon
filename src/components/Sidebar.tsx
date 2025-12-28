@@ -1,10 +1,11 @@
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth, UserButton } from '@clerk/clerk-react';
+import { useAuth } from '@clerk/clerk-react';
 import { cn } from '@/lib/utils';
 import { navItems } from '@/config/navigation';
 import { SIDEBAR_WIDTH } from '@/constants/layout';
 import { BRAND } from '@/config/brand';
+import { UserAccountMenu } from '@/components/UserAccountMenu';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -88,19 +89,8 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
           {/* Auth Buttons or User Menu */}
           {isLoaded && (
             <>
-              {isSignedIn ? (
-                <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-muted/30">
-                  <UserButton
-                    appearance={{
-                      elements: {
-                        avatarBox: 'w-8 h-8',
-                        userButtonPopoverCard: 'bg-card border border-border',
-                        userButtonPopoverActionButton: 'hover:bg-muted',
-                      },
-                    }}
-                  />
-                  <span className="text-foreground text-sm font-medium">My Account</span>
-                </div>
+          {isSignedIn ? (
+                <UserAccountMenu />
               ) : (
                 <>
                   <button
