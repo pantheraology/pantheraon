@@ -13,6 +13,8 @@ import Index from "./pages/Index";
 import Discover from "./pages/Discover";
 import Spaces from "./pages/Spaces";
 import Library from "./pages/Library";
+import Settings from "./pages/Settings";
+import Archived from "./pages/Archived";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
@@ -36,6 +38,8 @@ const AppContent = () => {
           <Route path="/discover" element={<Discover />} />
           <Route path="/spaces" element={<Spaces />} />
           <Route path="/library" element={<Library />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/archived" element={<Archived />} />
           <Route path="/sign-in/*" element={<SignIn />} />
           <Route path="/sign-up/*" element={<SignUp />} />
           <Route path="*" element={<NotFound />} />
