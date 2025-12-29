@@ -1,5 +1,7 @@
 // Hooks barrel export
 export { useChat } from './useChat';
+export { useChatStream } from './useChatStream';
+export { useFileUpload } from './useFileUpload';
 export { useConversations } from './useConversations';
 export { useSpaces } from './useSpaces';
 export { useAuthGuard } from './useAuthGuard';
@@ -17,6 +19,7 @@ export { useTranslation, useT, useTranslationKey } from './useTranslation';
 export { useLongPress } from './useLongPress';
 export { useNavOrder } from './useNavOrder';
 export { useApiKeys } from './useApiKeys';
+export { usePrompts } from './usePrompts';
 
 // Re-export types for convenience
 export type { Conversation, Space, Message, ChatMode, ChatAttachment, ChatOptions, UploadedFile } from '@/types';

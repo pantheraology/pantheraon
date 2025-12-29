@@ -1,10 +1,14 @@
-import { useState, useCallback, useRef } from 'react';
-import { Message, ChatMode, ChatAttachment, UploadedFile, ChatOptions } from '@/types';
-import { STORAGE_BUCKETS, SIGNED_URL_EXPIRY_SECONDS } from '@/constants/files';
-import { toast } from 'sonner';
-import { getChatUrl } from '@/lib/api';
+/**
+ * Chat Hook - Orchestrator
+ * Combines file upload and streaming into a unified chat experience
+ */
+
+import { useState, useCallback } from 'react';
+import { Message, ChatOptions, UploadedFile } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
-import { CHAT_TIMEOUT_MS, RATE_LIMIT_DEFAULT_SECONDS } from '@/constants/timing';
+import { toast } from 'sonner';
+import { useFileUpload } from './useFileUpload';
+import { useChatStream } from './useChatStream';
 
 // Re-export types for backward compatibility
 export type { ChatOptions } from '@/types';
@@ -13,15 +17,14 @@ export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [rateLimitRetryAt, setRateLimitRetryAt] = useState<Date | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const { uploadAttachments } = useFileUpload();
+  const { streamChat, cancelStream } = useChatStream();
 
   const cancelRequest = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setIsLoading(false);
-    }
-  }, []);
+    cancelStream();
+    setIsLoading(false);
+  }, [cancelStream]);
 
   const clearRateLimit = useCallback(() => {
     setRateLimitRetryAt(null);
@@ -30,41 +33,6 @@ export const useChat = () => {
   const setInitialMessages = useCallback((initialMessages: Message[]) => {
     setMessages(initialMessages);
   }, []);
-
-  // Upload attachments to storage
-  const uploadAttachments = async (attachments: ChatAttachment[], userId: string): Promise<UploadedFile[]> => {
-    const uploadedFiles: UploadedFile[] = [];
-
-    for (const attachment of attachments) {
-      const filePath = `${userId}/${Date.now()}_${attachment.file.name}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKETS.CHAT_ATTACHMENTS)
-        .upload(filePath, attachment.file);
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        toast.error(`Failed to upload ${attachment.file.name}`);
-        continue;
-      }
-
-      // Get signed URL for the file
-      const { data: signedData } = await supabase.storage
-        .from(STORAGE_BUCKETS.CHAT_ATTACHMENTS)
-        .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS);
-
-      if (signedData?.signedUrl) {
-        uploadedFiles.push({
-          url: signedData.signedUrl,
-          type: attachment.type,
-          name: attachment.file.name,
-          mimeType: attachment.file.type,
-        });
-      }
-    }
-
-    return uploadedFiles;
-  };
 
   const sendMessage = useCallback(async (content: string, options?: ChatOptions) => {
     // Check if rate limited
@@ -76,7 +44,7 @@ export const useChat = () => {
     // Cancel any existing request
     cancelRequest();
 
-    // Get session first
+    // Get session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       toast.error('Please sign in to use chat');
@@ -102,11 +70,7 @@ export const useChat = () => {
       const fileDescriptions = uploadedFiles.map(f => 
         f.type === 'image' ? `[Image: ${f.name}]` : `[Document: ${f.name}]`
       ).join(' ');
-      if (content) {
-        messageContent = `${content}\n\n${fileDescriptions}`;
-      } else {
-        messageContent = fileDescriptions;
-      }
+      messageContent = content ? `${content}\n\n${fileDescriptions}` : fileDescriptions;
     }
 
     const userMessage: Message = {
@@ -116,171 +80,46 @@ export const useChat = () => {
       timestamp: new Date(),
     };
 
+    const assistantId = crypto.randomUUID();
+    
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Create new AbortController
-    abortControllerRef.current = new AbortController();
-    const { signal } = abortControllerRef.current;
+    // Add placeholder assistant message
+    setMessages(prev => [...prev, { 
+      id: assistantId, 
+      role: 'assistant', 
+      content: '',
+      timestamp: new Date(),
+    }]);
 
-    // Setup timeout
-    const timeoutId = setTimeout(() => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        toast.error('Request timed out. Please try again.');
-      }
-    }, CHAT_TIMEOUT_MS);
-
-    let assistantContent = '';
-
-    try {
-      const resp = await fetch(getChatUrl(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+    await streamChat(
+      [...messages, userMessage],
+      session.access_token,
+      {
+        mode: options?.mode,
+        model: options?.model,
+        agentId: options?.agentId,
+        attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
+      },
+      {
+        onChunk: (content) => {
+          setMessages(prev => 
+            prev.map(m => m.id === assistantId ? { ...m, content } : m)
+          );
         },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map(m => ({
-            role: m.role,
-            content: m.content,
-          })),
-          mode: options?.mode || 'normal',
-          model: options?.model || 'google/gemini-2.5-flash',
-          agentId: options?.agentId,
-          attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
-        }),
-        signal,
-      });
-
-      if (!resp.ok) {
-        const errorData = await resp.json().catch(() => ({}));
-        
-        if (resp.status === 429) {
-          // Extract retry-after header or default to 60 seconds
-          const retryAfter = resp.headers.get('Retry-After');
-          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : RATE_LIMIT_DEFAULT_SECONDS;
-          const retryAt = new Date(Date.now() + retrySeconds * 1000);
+        onComplete: () => {
+          setIsLoading(false);
+        },
+        onError: () => {
+          setIsLoading(false);
+        },
+        onRateLimit: (retryAt) => {
           setRateLimitRetryAt(retryAt);
-          
-          toast.error(`Rate limit exceeded. Please wait ${retrySeconds} seconds.`);
-        } else if (resp.status === 402) {
-          toast.error('Usage limit reached. Please add credits to continue.');
-        } else {
-          toast.error(errorData.error || 'Failed to get AI response');
-        }
-        
-        setIsLoading(false);
-        clearTimeout(timeoutId);
-        return;
+        },
       }
-
-      if (!resp.body) {
-        throw new Error('No response body');
-      }
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let textBuffer = '';
-      let streamDone = false;
-
-      // Create assistant message placeholder
-      const assistantId = crypto.randomUUID();
-      setMessages(prev => [...prev, { 
-        id: assistantId, 
-        role: 'assistant', 
-        content: '',
-        timestamp: new Date(),
-      }]);
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        // Check if aborted
-        if (signal.aborted) {
-          reader.cancel();
-          break;
-        }
-        
-        textBuffer += decoder.decode(value, { stream: true });
-
-        let newlineIndex: number;
-        while ((newlineIndex = textBuffer.indexOf('\n')) !== -1) {
-          let line = textBuffer.slice(0, newlineIndex);
-          textBuffer = textBuffer.slice(newlineIndex + 1);
-
-          if (line.endsWith('\r')) line = line.slice(0, -1);
-          if (line.startsWith(':') || line.trim() === '') continue;
-          if (!line.startsWith('data: ')) continue;
-
-          const jsonStr = line.slice(6).trim();
-          if (jsonStr === '[DONE]') {
-            streamDone = true;
-            break;
-          }
-
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const chunkContent = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (chunkContent) {
-              assistantContent += chunkContent;
-              setMessages(prev => 
-                prev.map(m => 
-                  m.id === assistantId 
-                    ? { ...m, content: assistantContent }
-                    : m
-                )
-              );
-            }
-          } catch {
-            // Incomplete JSON, put it back and wait for more data
-            textBuffer = line + '\n' + textBuffer;
-            break;
-          }
-        }
-      }
-
-      // Final flush
-      if (textBuffer.trim() && !signal.aborted) {
-        for (let raw of textBuffer.split('\n')) {
-          if (!raw) continue;
-          if (raw.endsWith('\r')) raw = raw.slice(0, -1);
-          if (raw.startsWith(':') || raw.trim() === '') continue;
-          if (!raw.startsWith('data: ')) continue;
-          const jsonStr = raw.slice(6).trim();
-          if (jsonStr === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const chunkContent = parsed.choices?.[0]?.delta?.content as string | undefined;
-            if (chunkContent) {
-              assistantContent += chunkContent;
-            }
-          } catch { /* ignore */ }
-        }
-        
-        // Final update
-        setMessages(prev => 
-          prev.map(m => 
-            m.id === assistantId 
-              ? { ...m, content: assistantContent }
-              : m
-          )
-        );
-      }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        // Request was cancelled - don't show error
-      } else {
-        console.error('Chat error:', error);
-        toast.error('Failed to send message. Please try again.');
-      }
-    } finally {
-      clearTimeout(timeoutId);
-      abortControllerRef.current = null;
-      setIsLoading(false);
-    }
-  }, [messages, cancelRequest, rateLimitRetryAt]);
+    );
+  }, [messages, cancelRequest, rateLimitRetryAt, uploadAttachments, streamChat]);
 
   const clearMessages = useCallback(() => {
     cancelRequest();
