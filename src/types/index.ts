@@ -31,21 +31,14 @@ export interface ChatOptions {
   attachments?: File[];
 }
 
-// LLM Models available through Lovable AI
-export interface ModelOption {
-  id: string;
-  name: string;
-  description: string;
-  provider: 'google' | 'openai';
-}
-
-export const AVAILABLE_MODELS: ModelOption[] = [
-  { id: 'google/gemini-2.5-flash', name: 'Gemini Flash', description: 'Fast & balanced', provider: 'google' },
-  { id: 'google/gemini-2.5-pro', name: 'Gemini Pro', description: 'Most capable', provider: 'google' },
-  { id: 'google/gemini-2.5-flash-lite', name: 'Gemini Lite', description: 'Fastest', provider: 'google' },
-  { id: 'openai/gpt-5', name: 'GPT-5', description: 'Premium', provider: 'openai' },
-  { id: 'openai/gpt-5-mini', name: 'GPT-5 Mini', description: 'Balanced', provider: 'openai' },
-];
+// Re-export models from centralized location
+export { 
+  CHAT_MODELS, 
+  CHAT_MODELS as AVAILABLE_MODELS, 
+  AGENT_MODELS,
+  AGENT_CAPABILITIES,
+  type ModelOption 
+} from './models';
 
 // API Key providers for BYOK
 export type ApiKeyProvider = 'openai' | 'anthropic' | 'google';

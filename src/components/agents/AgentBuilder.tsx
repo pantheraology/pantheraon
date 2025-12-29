@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useAgent } from '@/hooks/useAgents';
+import { useAgent } from '@/hooks/useAgent';
 import { useAgents } from '@/hooks/useAgents';
-import { AVAILABLE_MODELS, AVAILABLE_CAPABILITIES } from '@/types/agent';
+import { AGENT_MODELS, AGENT_CAPABILITIES } from '@/types/models';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -389,7 +389,7 @@ export const AgentBuilder = ({ agentId, onBack }: AgentBuilderProps) => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {AVAILABLE_MODELS.map((model) => (
+                    {AGENT_MODELS.map((model) => (
                       <div
                         key={model.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${
@@ -433,7 +433,7 @@ export const AgentBuilder = ({ agentId, onBack }: AgentBuilderProps) => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {AVAILABLE_CAPABILITIES.map((capability) => (
+                    {AGENT_CAPABILITIES.map((capability) => (
                       <div
                         key={capability.id}
                         className={`flex items-center gap-4 p-4 rounded-lg border cursor-pointer transition-colors ${
