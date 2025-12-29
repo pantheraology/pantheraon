@@ -1,6 +1,5 @@
-
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@clerk/clerk-react';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { navItems } from '@/config/navigation';
 import { SIDEBAR_WIDTH } from '@/constants/layout';
@@ -15,8 +14,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarProps) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { isSignedIn, isLoaded } = useAuth();
+  const { user, isLoading } = useAuth();
 
   const handleNavClick = () => {
     if (isMobile && onClose) {
@@ -87,30 +85,30 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
           </div>
 
           {/* Auth Buttons or User Menu */}
-          {!isLoaded ? (
+          {isLoading ? (
             <div className="animate-pulse space-y-3">
               <div className="h-10 bg-muted/50 rounded-lg" />
               <div className="h-10 bg-muted/50 rounded-lg" />
             </div>
-          ) : isSignedIn ? (
+          ) : user ? (
             <UserAccountMenu />
           ) : (
             <>
-              <a
-                href="https://accounts.panthera.ai/sign-up"
+              <Link
+                to="/auth"
                 onClick={handleNavClick}
                 className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all text-center block"
               >
                 Sign up
-              </a>
+              </Link>
 
-              <a
-                href="https://accounts.panthera.ai/sign-in"
+              <Link
+                to="/auth"
                 onClick={handleNavClick}
                 className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all text-center block"
               >
                 Log in
-              </a>
+              </Link>
             </>
           )}
         </div>
