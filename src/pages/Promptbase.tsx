@@ -1,34 +1,18 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, BookMarked } from 'lucide-react';
+import { Plus, BookMarked } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { usePrompts, SavedPrompt, CreatePromptData } from '@/hooks/usePrompts';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { EmptyState } from '@/components/common/EmptyState';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { CardSkeleton } from '@/components/common/LoadingSkeleton';
+import { FeatureErrorBoundary } from '@/components/common/FeatureErrorBoundary';
+import { PromptFormDialog } from '@/components/prompts/PromptFormDialog';
+import { PromptCard } from '@/components/prompts/PromptCard';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 
-const Promptbase = () => {
+const PromptbaseContent = () => {
   const { user, isLoading: isAuthLoading } = useAuth();
   const { prompts, isLoading, createPrompt, updatePrompt, deletePrompt } = usePrompts();
   
@@ -141,116 +125,42 @@ const Promptbase = () => {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {prompts.map((prompt) => (
-              <div
+              <PromptCard
                 key={prompt.id}
-                className="glass rounded-xl p-4 space-y-3 group hover:border-primary/30 transition-colors"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium truncate">{prompt.title}</h3>
-                    {prompt.category && (
-                      <span className="text-xs text-primary/70">{prompt.category}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => handleOpenEdit(prompt)}
-                    >
-                      <Pencil size={14} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDeletePromptId(prompt.id)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground line-clamp-3">
-                  {prompt.content}
-                </p>
-              </div>
+                prompt={prompt}
+                onEdit={handleOpenEdit}
+                onDelete={setDeletePromptId}
+              />
             ))}
           </div>
         )}
       </div>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingPrompt ? 'Edit Prompt' : 'Create New Prompt'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
-              <Input
-                id="title"
-                placeholder="e.g., Code Review"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="category">Category (optional)</Label>
-              <Input
-                id="category"
-                placeholder="e.g., Development"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="content">Prompt Content</Label>
-              <Textarea
-                id="content"
-                placeholder="Enter your prompt here..."
-                rows={6}
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmit}
-              disabled={!formData.title.trim() || !formData.content.trim()}
-            >
-              {editingPrompt ? 'Save Changes' : 'Create Prompt'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PromptFormDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingPrompt={editingPrompt}
+        formData={formData}
+        onFormDataChange={setFormData}
+        onSubmit={handleSubmit}
+        isSubmitting={createPrompt.isPending || updatePrompt.isPending}
+      />
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deletePromptId} onOpenChange={() => setDeletePromptId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Prompt?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This prompt will be permanently deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        isOpen={!!deletePromptId}
+        onOpenChange={() => setDeletePromptId(null)}
+        onConfirm={handleDelete}
+        title="Delete Prompt?"
+        description="This action cannot be undone. This prompt will be permanently deleted."
+      />
     </PageContainer>
   );
 };
+
+const Promptbase = () => (
+  <FeatureErrorBoundary featureName="Promptbase">
+    <PromptbaseContent />
+  </FeatureErrorBoundary>
+);
 
 export default Promptbase;
