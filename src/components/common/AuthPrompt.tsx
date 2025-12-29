@@ -18,7 +18,7 @@ export const AuthPrompt = ({
       <h3 className="text-lg font-medium text-foreground mb-2">{title}</h3>
       <p className="text-muted-foreground mb-4">{description}</p>
       <Link
-        to="/sign-in"
+        to="/auth"
         className="inline-block px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium hover:brightness-110 transition-all"
       >
         {actionLabel}
