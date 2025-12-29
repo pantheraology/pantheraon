@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Brain, Search, ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ChatMode, AVAILABLE_MODELS } from '@/types';
+import { ChatMode, CHAT_MODELS } from '@/types';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -20,7 +20,7 @@ interface ChatInputProps {
 export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anything..." }: ChatInputProps) => {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<ChatMode>('normal');
-  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState(CHAT_MODELS[0]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
@@ -121,7 +121,7 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
-                {AVAILABLE_MODELS.map((model) => (
+                {CHAT_MODELS.map((model) => (
                   <DropdownMenuItem
                     key={model.id}
                     onClick={() => setSelectedModel(model)}
