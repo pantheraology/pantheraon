@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { EmptyState } from '@/components/common/EmptyState';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { useGroupChats } from '@/hooks/useGroupChats';
+import { useDebounce } from '@/hooks/useDebounce';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Users, Plus, Search } from 'lucide-react';
@@ -18,6 +19,7 @@ const Groups = () => {
   const { groupChats, isLoading, createGroupChat, leaveGroup, deleteGroup } = useGroupChats();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
 
   // Show auth prompt if not signed in
@@ -44,8 +46,11 @@ const Groups = () => {
     );
   }
 
-  const filteredGroups = groupChats.filter((group) =>
-    group.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredGroups = useMemo(() => 
+    groupChats.filter((group) =>
+      group.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    ),
+    [groupChats, debouncedSearchQuery]
   );
 
   return (

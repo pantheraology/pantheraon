@@ -9,6 +9,7 @@ import { MobileMenuButton } from "@/components/MobileMenuButton";
 import { BackgroundEffects } from "@/components/BackgroundEffects";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSidebar } from "@/hooks/useSidebar";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { SIDEBAR_WIDTH } from "@/constants/layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
@@ -26,7 +27,21 @@ const Archived = lazy(() => import("./pages/Archived"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-const queryClient = new QueryClient();
+// Configure QueryClient with optimized defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes (formerly cacheTime)
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 // Loading fallback component
 const PageLoader = () => (
@@ -37,6 +52,9 @@ const PageLoader = () => (
 
 const AppContent = () => {
   const { isOpen, isMobile, toggle, close } = useSidebar();
+  
+  // Initialize global keyboard shortcuts
+  useKeyboardShortcuts();
 
   return (
     <div className="flex w-full min-h-screen bg-background">

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Trash2, RotateCcw, Search, MessageSquare } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useDebounce } from '@/hooks/useDebounce';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -23,10 +24,14 @@ const Archived = () => {
   const { deletedConversations, isLoading, restoreConversation, permanentlyDeleteConversation } = useConversations();
   const { isSignedIn, isLoaded } = useAuthGuard();
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
-  const filteredConversations = deletedConversations.filter(c =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredConversations = useMemo(() => 
+    deletedConversations.filter(c =>
+      c.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      c.messages.some(m => m.content.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))
+    ),
+    [deletedConversations, debouncedSearchQuery]
   );
 
   if (isLoaded && !isSignedIn) {
