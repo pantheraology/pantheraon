@@ -13,12 +13,11 @@ export interface GroupChatMember {
   user_id: string;
   role: 'admin' | 'member';
   joined_at: string;
-  // Joined profile data
+  // Joined profile data - email intentionally excluded to prevent PII exposure
   profile?: {
     id: string;
     full_name: string | null;
     avatar_url: string | null;
-    email: string | null;
     username: string | null;
   };
 }

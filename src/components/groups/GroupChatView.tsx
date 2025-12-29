@@ -109,12 +109,12 @@ export const GroupChatView = ({ groupId, onBack }: GroupChatViewProps) => {
                   <Avatar className="h-10 w-10">
                     <AvatarImage src={member.profile?.avatar_url || undefined} />
                     <AvatarFallback className="bg-primary/20 text-primary">
-                      {member.profile?.full_name?.[0] || member.profile?.email?.[0] || '?'}
+                      {member.profile?.full_name?.[0] || member.profile?.username?.[0] || '?'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground truncate">
-                      {member.profile?.full_name || member.profile?.email || 'Unknown'}
+                      {member.profile?.full_name || member.profile?.username || 'Unknown'}
                       {member.user_id === user?.id && (
                         <span className="text-muted-foreground ml-1">(you)</span>
                       )}

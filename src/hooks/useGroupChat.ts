@@ -45,11 +45,12 @@ export const useGroupChat = (groupId: string | null) => {
 
       if (membersError) throw membersError;
       
-      // Fetch profiles for members
+      // Fetch profiles for members - exclude email to prevent PII exposure
+      // Only fetch non-sensitive profile fields for group members
       const memberUserIds = (membersData || []).map(m => m.user_id);
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, email, username')
+        .select('id, full_name, avatar_url, username')
         .in('id', memberUserIds);
       
       const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
