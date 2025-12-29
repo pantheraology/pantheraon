@@ -1,6 +1,6 @@
 import { Compass } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { discoverCategories } from '@/data/discover-categories';
+import { DISCOVER_CATEGORIES } from '@/config/discover-categories';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { BRAND } from '@/config/brand';
 
@@ -22,7 +22,7 @@ const Discover = () => {
 
       {/* Categories Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
-        {discoverCategories.map((category) => {
+        {DISCOVER_CATEGORIES.map((category) => {
           const Icon = category.icon;
           return (
             <Link

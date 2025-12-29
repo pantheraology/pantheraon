@@ -38,12 +38,20 @@ export interface AgentKnowledge {
   created_at: string;
 }
 
+export interface AgentActionConfig {
+  url?: string;
+  method?: string;
+  headers?: Record<string, string>;
+  params?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface AgentAction {
   id: string;
   agent_id: string;
   action_type: string;
   action_name: string;
-  config: any;
+  config: AgentActionConfig | Record<string, unknown> | null;
   created_at: string;
 }
 

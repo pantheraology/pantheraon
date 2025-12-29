@@ -1,20 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Settings, Archive, LogOut, Palette, Check } from 'lucide-react';
-import { useTheme, ThemeName } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
+import { THEMES } from '@/config/themes';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-
-const themes: { id: ThemeName; name: string; color: string }[] = [
-  { id: 'space-blue', name: 'Space Blue', color: 'hsl(220 90% 50%)' },
-  { id: 'neon-orange', name: 'Neon Orange', color: 'hsl(14 100% 50%)' },
-  { id: 'cyber-yellow', name: 'Cyber Yellow', color: 'hsl(75 100% 50%)' },
-  { id: 'aqua-cyan', name: 'Aqua Cyan', color: 'hsl(187 94% 43%)' },
-];
 
 export const UserAccountMenu = () => {
   const { user, profile, signOut } = useAuth();
@@ -68,7 +62,7 @@ export const UserAccountMenu = () => {
               <span className="text-sm text-foreground">Themes</span>
             </div>
             <div className="flex gap-2">
-              {themes.map((t) => (
+              {THEMES.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTheme(t.id)}
