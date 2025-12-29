@@ -53,27 +53,29 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
 
           {/* Navigation */}
           <nav className="flex flex-col gap-2 mt-8">
-            {navItems.map((item) => {
-              const isActive = location.pathname === item.path;
-              const Icon = item.icon;
+            {navItems
+              .filter((item) => !item.requiresAuth || user)
+              .map((item) => {
+                const isActive = location.pathname === item.path;
+                const Icon = item.icon;
 
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={handleNavClick}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-2.5 w-full rounded-lg transition-all duration-200",
-                    isActive
-                      ? "bg-[radial-gradient(85.38%_270.12%_at_0%_50%,hsl(var(--primary))_0%,hsl(var(--primary)/0.7)_35%,hsl(var(--primary)/0.4)_75%,hsl(var(--primary)/0.25)_100%)] text-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  )}
-                >
-                  <Icon size={18} />
-                  <span className="font-medium text-[15px]">{item.label}</span>
-                </Link>
-              );
-            })}
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={handleNavClick}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-2.5 w-full rounded-lg transition-all duration-200",
+                      isActive
+                        ? "bg-[radial-gradient(85.38%_270.12%_at_0%_50%,hsl(var(--primary))_0%,hsl(var(--primary)/0.7)_35%,hsl(var(--primary)/0.4)_75%,hsl(var(--primary)/0.25)_100%)] text-foreground shadow-lg"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    <Icon size={18} />
+                    <span className="font-medium text-[15px]">{item.label}</span>
+                  </Link>
+                );
+              })}
           </nav>
         </div>
 

@@ -3,7 +3,7 @@ import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
 import { SuggestionChips } from '@/components/SuggestionChips';
-import { AuthModal } from '@/components/AuthModal';
+import { GuestWelcome } from '@/components/GuestWelcome';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
@@ -11,7 +11,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 const Index = () => {
   const { messages, isLoading, sendMessage, clearMessages } = useChat();
   const { saveConversation } = useConversations();
-  const { isSignedIn, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
+  const { isSignedIn } = useAuthGuard();
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const [greeting, setGreeting] = useState('Good Evening');
 
@@ -42,16 +42,17 @@ const Index = () => {
   }, [clearMessages]);
 
   const handleSendMessage = useCallback((content: string) => {
-    requireAuth(() => {
-      sendMessage(content);
-    });
-  }, [requireAuth, sendMessage]);
+    sendMessage(content);
+  }, [sendMessage]);
 
   const handleSuggestionSelect = useCallback((prompt: string) => {
-    requireAuth(() => {
-      sendMessage(prompt);
-    });
-  }, [requireAuth, sendMessage]);
+    sendMessage(prompt);
+  }, [sendMessage]);
+
+  // Show guest welcome for non-authenticated users
+  if (!isSignedIn) {
+    return <GuestWelcome />;
+  }
 
   const hasMessages = messages.length > 0;
 
@@ -97,13 +98,6 @@ const Index = () => {
           </div>
         )}
       </div>
-
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={closeAuthModal}
-        message="Sign in to send messages and save your conversations."
-      />
     </div>
   );
 };
