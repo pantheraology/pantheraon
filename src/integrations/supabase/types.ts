@@ -14,6 +14,193 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_actions: {
+        Row: {
+          action_name: string
+          action_type: string
+          agent_id: string
+          config: Json | null
+          created_at: string
+          id: string
+        }
+        Insert: {
+          action_name: string
+          action_type: string
+          agent_id: string
+          config?: Json | null
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          action_name?: string
+          action_type?: string
+          agent_id?: string
+          config?: Json | null
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_actions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_capabilities: {
+        Row: {
+          agent_id: string
+          capability: string
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          capability: string
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          capability?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_capabilities_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_conversation_starters: {
+        Row: {
+          agent_id: string
+          display_order: number
+          id: string
+          prompt: string
+        }
+        Insert: {
+          agent_id: string
+          display_order?: number
+          id?: string
+          prompt: string
+        }
+        Update: {
+          agent_id?: string
+          display_order?: number
+          id?: string
+          prompt?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversation_starters_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_knowledge: {
+        Row: {
+          agent_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_knowledge_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_models: {
+        Row: {
+          agent_id: string
+          id: string
+          model_id: string
+        }
+        Insert: {
+          agent_id: string
+          id?: string
+          model_id: string
+        }
+        Update: {
+          agent_id?: string
+          id?: string
+          model_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_models_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          instructions: string | null
+          is_main: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          instructions?: string | null
+          is_main?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          instructions?: string | null
+          is_main?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string | null
@@ -240,7 +427,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      owns_agent: { Args: { agent_uuid: string }; Returns: boolean }
     }
     Enums: {
       group_member_role: "admin" | "member"
