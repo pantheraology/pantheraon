@@ -1,28 +1,28 @@
 import { useState, useCallback } from 'react';
-import { useAuth } from '@clerk/clerk-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useAuthGuard = () => {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { user, isLoading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const requireAuth = useCallback((action: () => void) => {
-    if (!isLoaded) return;
+    if (isLoading) return;
     
-    if (!isSignedIn) {
+    if (!user) {
       setShowAuthModal(true);
       return;
     }
     
     action();
-  }, [isSignedIn, isLoaded]);
+  }, [user, isLoading]);
 
   const closeAuthModal = useCallback(() => {
     setShowAuthModal(false);
   }, []);
 
   return {
-    isSignedIn: isSignedIn ?? false,
-    isLoaded,
+    isSignedIn: !!user,
+    isLoaded: !isLoading,
     showAuthModal,
     requireAuth,
     closeAuthModal,

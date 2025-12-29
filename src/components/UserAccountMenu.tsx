@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Settings, Archive, LogOut } from 'lucide-react';
 import {
   Popover,
@@ -9,17 +9,18 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export const UserAccountMenu = () => {
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
   if (!user) return null;
 
-  const displayName = user.firstName || user.username || 'User';
+  const displayName = profile?.full_name || user.email?.split('@')[0] || 'User';
   const initials = displayName.slice(0, 2).toUpperCase();
+  const avatarUrl = profile?.avatar_url || user.user_metadata?.avatar_url;
 
-  const handleSignOut = () => {
-    signOut(() => navigate('/'));
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
   };
 
   return (
@@ -27,7 +28,7 @@ export const UserAccountMenu = () => {
       <PopoverTrigger asChild>
         <button className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-muted/30 transition-colors w-full text-left">
           <Avatar className="w-8 h-8">
-            <AvatarImage src={user.imageUrl} alt={displayName} />
+            <AvatarImage src={avatarUrl} alt={displayName} />
             <AvatarFallback className="bg-primary/20 text-primary text-xs">
               {initials}
             </AvatarFallback>
