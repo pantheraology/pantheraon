@@ -25,12 +25,15 @@ const Index = () => {
 
   // Save conversation when messages change (only if signed in)
   useEffect(() => {
-    if (isSignedIn && messages.length >= 2) {
-      const id = saveConversation(messages, currentConversationId);
-      if (!currentConversationId) {
-        setCurrentConversationId(id);
+    const saveMessages = async () => {
+      if (isSignedIn && messages.length >= 2) {
+        const id = await saveConversation(messages, currentConversationId);
+        if (id && !currentConversationId) {
+          setCurrentConversationId(id);
+        }
       }
-    }
+    };
+    saveMessages();
   }, [messages, currentConversationId, saveConversation, isSignedIn]);
 
   const handleNewThread = useCallback(() => {
