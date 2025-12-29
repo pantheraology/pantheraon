@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ChatOptions {
+export interface ChatOptions {
   mode?: ChatMode;
   model?: string;
 }

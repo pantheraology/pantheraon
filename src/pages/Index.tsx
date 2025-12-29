@@ -3,7 +3,7 @@ import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
 import { SuggestionChips } from '@/components/SuggestionChips';
-import { useChat } from '@/hooks/useChat';
+import { useChat, ChatOptions } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,11 +49,11 @@ const Index = () => {
     clearMessages();
     setCurrentConversationId(undefined);
   }, [clearMessages]);
-  const handleSendMessage = useCallback((content: string) => {
-    sendMessage(content);
+  const handleSendMessage = useCallback((content: string, options?: ChatOptions) => {
+    sendMessage(content, options);
   }, [sendMessage]);
   const handleSuggestionSelect = useCallback((prompt: string) => {
-    sendMessage(prompt);
+    sendMessage(prompt, { mode: 'normal', model: 'google/gemini-2.5-flash' });
   }, [sendMessage]);
   const hasMessages = messages.length > 0;
   return <div className="relative flex-1 h-screen flex flex-col">

@@ -157,6 +157,31 @@ function getModelForMode(requestedModel: string, mode: ChatMode): string {
   return requestedModel;
 }
 
+// Map models to their correct format for direct API calls
+function getOpenAIModelName(model: string): string {
+  switch (model) {
+    case 'openai/gpt-5':
+      return 'gpt-5-2025-08-07';
+    case 'openai/gpt-5-mini':
+      return 'gpt-5-mini-2025-08-07';
+    default:
+      return 'gpt-5-2025-08-07';
+  }
+}
+
+function getGoogleModelName(model: string): string {
+  switch (model) {
+    case 'google/gemini-2.5-flash':
+      return 'gemini-2.5-flash';
+    case 'google/gemini-2.5-pro':
+      return 'gemini-2.5-pro';
+    case 'google/gemini-2.5-flash-lite':
+      return 'gemini-2.5-flash-lite';
+    default:
+      return 'gemini-2.5-flash';
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -206,40 +231,170 @@ serve(async (req) => {
     }
 
     const { messages, mode, model: requestedModel } = validation.body!;
+    const finalModel = getModelForMode(requestedModel!, mode!);
+    const systemPrompt = getSystemPrompt(mode!);
     
     // Check for user's own API key (BYOK)
-    let apiKey = Deno.env.get("LOVABLE_API_KEY");
-    let apiUrl = "https://ai.gateway.lovable.dev/v1/chat/completions";
-    let useByok = false;
-
-    // Check if user has their own API key for the selected model's provider
     const { data: userApiKeys } = await supabaseClient
       .from('user_api_keys')
       .select('*')
       .eq('user_id', user.id)
       .eq('is_active', true);
 
-    if (userApiKeys && userApiKeys.length > 0) {
-      const provider = requestedModel!.startsWith('openai/') ? 'openai' : 'google';
-      const userKey = userApiKeys.find(k => k.provider === provider);
+    // Determine if we can use BYOK
+    const provider = finalModel.startsWith('openai/') ? 'openai' : 'google';
+    const userKey = userApiKeys?.find(k => k.provider === provider);
+
+    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${!!userKey}, messages=${messages.length}`);
+
+    // If user has their own API key for this provider, use it directly
+    if (userKey) {
+      console.log(`Using BYOK for provider: ${provider}`);
       
-      if (userKey) {
-        useByok = true;
-        apiKey = userKey.api_key;
-        
-        if (provider === 'openai') {
-          apiUrl = "https://api.openai.com/v1/chat/completions";
-        } else if (provider === 'google') {
-          // Google AI Studio API
-          apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + 
-                   requestedModel!.replace('google/', '') + ":streamGenerateContent";
+      if (provider === 'openai') {
+        // Direct OpenAI API call
+        const openaiModel = getOpenAIModelName(finalModel);
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${userKey.api_key}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: openaiModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              ...messages,
+            ],
+            stream: true,
+            max_completion_tokens: 4096,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("OpenAI API error:", response.status, errorText);
+          
+          if (response.status === 401) {
+            return new Response(JSON.stringify({ error: "Invalid OpenAI API key. Please check your API key in Settings." }), {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (response.status === 429) {
+            return new Response(JSON.stringify({ error: "OpenAI rate limit exceeded. Please try again later." }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          
+          return new Response(JSON.stringify({ error: "Failed to get AI response from OpenAI" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-        
-        console.log(`Using BYOK for provider: ${provider}`);
+
+        return new Response(response.body, {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      } else if (provider === 'google') {
+        // Direct Google AI API call
+        const googleModel = getGoogleModelName(finalModel);
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:streamGenerateContent?key=${userKey.api_key}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: systemPrompt }] },
+              ...messages.map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+              }))
+            ],
+            generationConfig: {
+              maxOutputTokens: 4096,
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Google AI API error:", response.status, errorText);
+          
+          if (response.status === 401 || response.status === 403) {
+            return new Response(JSON.stringify({ error: "Invalid Google AI API key. Please check your API key in Settings." }), {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (response.status === 429) {
+            return new Response(JSON.stringify({ error: "Google AI rate limit exceeded. Please try again later." }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          
+          return new Response(JSON.stringify({ error: "Failed to get AI response from Google AI" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Transform Google's SSE format to OpenAI-compatible format for the frontend
+        const transformStream = new TransformStream({
+          transform(chunk, controller) {
+            const text = new TextDecoder().decode(chunk);
+            try {
+              // Google sends JSON objects, convert to OpenAI SSE format
+              const lines = text.split('\n').filter(line => line.trim());
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                    const openaiFormat = {
+                      choices: [{
+                        delta: { content: data.candidates[0].content.parts[0].text }
+                      }]
+                    };
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiFormat)}\n\n`));
+                  }
+                } else if (line.trim() && !line.startsWith('[')) {
+                  // Try parsing as JSON directly
+                  try {
+                    const data = JSON.parse(line);
+                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
+                      const openaiFormat = {
+                        choices: [{
+                          delta: { content: data.candidates[0].content.parts[0].text }
+                        }]
+                      };
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiFormat)}\n\n`));
+                    }
+                  } catch {
+                    // Ignore parsing errors for non-JSON lines
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Transform error:", e);
+            }
+          },
+          flush(controller) {
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          }
+        });
+
+        return new Response(response.body?.pipeThrough(transformStream), {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
       }
     }
-    
-    if (!apiKey) {
+
+    // Fallback to Lovable AI gateway
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableApiKey) {
       console.error("No API key available");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
         status: 500,
@@ -247,17 +402,10 @@ serve(async (req) => {
       });
     }
 
-    const finalModel = getModelForMode(requestedModel!, mode!);
-    const systemPrompt = getSystemPrompt(mode!);
-
-    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${useByok}, messages=${messages.length}`);
-
-    // For now, always use Lovable AI gateway (BYOK direct API calls need more work)
-    // In the future, we can add direct provider API calls for BYOK
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
+        Authorization: `Bearer ${lovableApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
