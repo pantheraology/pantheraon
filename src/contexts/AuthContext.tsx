@@ -5,7 +5,6 @@ import { toast } from 'sonner';
 
 interface Profile {
   id: string;
-  email: string | null;
   full_name: string | null;
   avatar_url: string | null;
   theme_preference: string | null;

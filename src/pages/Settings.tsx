@@ -261,7 +261,7 @@ const Settings = () => {
             </div>
             <div>
               <h3 className="font-medium text-foreground">{profile?.full_name || 'Your Name'}</h3>
-              <p className="text-sm text-muted-foreground">{profile?.email || user?.email}</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
               <button
                 onClick={() => avatarInputRef.current?.click()}
                 className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
@@ -306,7 +306,7 @@ const Settings = () => {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
-              value={profile?.email || user?.email || ''}
+              value={user?.email || ''}
               disabled
               className="max-w-md opacity-60"
             />
