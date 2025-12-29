@@ -29,11 +29,44 @@ export const useNavOrder = () => {
     }
   }, []);
 
+  // Reorder using full array indices
   const reorderItems = useCallback((fromIndex: number, toIndex: number) => {
     setOrderedItems(prev => {
       const newItems = [...prev];
       const [removed] = newItems.splice(fromIndex, 1);
       newItems.splice(toIndex, 0, removed);
+      
+      // Save to localStorage
+      const orderPaths = newItems.map(item => item.path);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(orderPaths));
+      
+      return newItems;
+    });
+  }, []);
+
+  // Reorder using visible items indices - maps back to full array
+  const reorderVisibleItems = useCallback((
+    visibleItems: NavItem[],
+    fromVisibleIndex: number,
+    toVisibleIndex: number
+  ) => {
+    setOrderedItems(prev => {
+      // Get the items being moved from the visible array
+      const itemToMove = visibleItems[fromVisibleIndex];
+      const targetItem = visibleItems[toVisibleIndex];
+      
+      if (!itemToMove || !targetItem) return prev;
+      
+      // Find their actual indices in the full ordered array
+      const fromFullIndex = prev.findIndex(item => item.path === itemToMove.path);
+      const toFullIndex = prev.findIndex(item => item.path === targetItem.path);
+      
+      if (fromFullIndex === -1 || toFullIndex === -1) return prev;
+      
+      // Perform the reorder on the full array
+      const newItems = [...prev];
+      const [removed] = newItems.splice(fromFullIndex, 1);
+      newItems.splice(toFullIndex, 0, removed);
       
       // Save to localStorage
       const orderPaths = newItems.map(item => item.path);
@@ -51,6 +84,7 @@ export const useNavOrder = () => {
   return {
     orderedItems,
     reorderItems,
+    reorderVisibleItems,
     resetOrder,
   };
 };
