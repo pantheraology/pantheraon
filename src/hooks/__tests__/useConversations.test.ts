@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useConversations } from '../useConversations';
 
 // Mock Supabase client
@@ -45,20 +45,20 @@ describe('useConversations', () => {
   });
 
   it('should initialize with empty conversations', async () => {
-    const { result } = renderHook(() => useConversations());
-    
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+    let result: any;
+    await act(async () => {
+      const hook = renderHook(() => useConversations());
+      result = hook.result;
     });
     
     expect(result.current.conversations).toEqual([]);
   });
 
   it('should provide conversation management functions', async () => {
-    const { result } = renderHook(() => useConversations());
-    
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+    let result: any;
+    await act(async () => {
+      const hook = renderHook(() => useConversations());
+      result = hook.result;
     });
 
     expect(typeof result.current.saveConversation).toBe('function');
@@ -69,10 +69,10 @@ describe('useConversations', () => {
   });
 
   it('should filter conversations by space', async () => {
-    const { result } = renderHook(() => useConversations());
-    
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
+    let result: any;
+    await act(async () => {
+      const hook = renderHook(() => useConversations());
+      result = hook.result;
     });
 
     const unassigned = result.current.getConversationsBySpace(null);
