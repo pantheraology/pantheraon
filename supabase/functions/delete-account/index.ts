@@ -50,15 +50,8 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Delete user data from all tables (order matters due to foreign keys)
-    // 1. Delete messages (references conversations)
-    const { error: messagesError } = await adminClient
-      .from('messages')
-      .delete()
-      .eq('conversation_id', 
-        adminClient.from('conversations').select('id').eq('user_id', userId)
-      );
     
-    // Actually, we need to get conversation IDs first
+    // 1. Get conversation IDs first, then delete messages
     const { data: conversations } = await adminClient
       .from('conversations')
       .select('id')
@@ -66,11 +59,13 @@ serve(async (req) => {
     
     if (conversations && conversations.length > 0) {
       const conversationIds = conversations.map(c => c.id);
-      await adminClient.from('messages').delete().in('conversation_id', conversationIds);
+      const { error: msgError } = await adminClient.from('messages').delete().in('conversation_id', conversationIds);
+      if (msgError) console.error('Error deleting messages:', msgError);
     }
 
     // 2. Delete conversations
-    await adminClient.from('conversations').delete().eq('user_id', userId);
+    const { error: convError } = await adminClient.from('conversations').delete().eq('user_id', userId);
+    if (convError) console.error('Error deleting conversations:', convError);
 
     // 3. Delete agent-related data
     const { data: agents } = await adminClient
@@ -105,10 +100,13 @@ serve(async (req) => {
     // 6. Delete studio generations
     await adminClient.from('studio_generations').delete().eq('user_id', userId);
 
-    // 7. Delete profile
+    // 7. Delete user API keys (BYOK)
+    await adminClient.from('user_api_keys').delete().eq('user_id', userId);
+
+    // 8. Delete profile
     await adminClient.from('profiles').delete().eq('id', userId);
 
-    // 8. Finally, delete the auth user
+    // 9. Finally, delete the auth user
     const { error: deleteUserError } = await adminClient.auth.admin.deleteUser(userId);
     
     if (deleteUserError) {
