@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Message } from '@/types';
 import { toast } from 'sonner';
-import { getChatUrl, getSupabaseKey } from '@/lib/api';
+import { getChatUrl } from '@/lib/api';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -21,11 +22,19 @@ export const useChat = () => {
     let assistantContent = '';
 
     try {
+      // Get the user's session token for authenticated requests
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Please sign in to use chat');
+        setIsLoading(false);
+        return;
+      }
+
       const resp = await fetch(getChatUrl(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getSupabaseKey()}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           messages: [...messages, userMessage].map(m => ({
