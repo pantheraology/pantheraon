@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Brain, Search, ChevronDown, Check, X, FileText } from 'lucide-react';
+import { Send, Paperclip, Brain, Search, ChevronDown, Check, X, FileText, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMode, ChatAttachment, CHAT_MODELS } from '@/types';
 import {
@@ -25,6 +25,8 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { PromptbasePopover } from '@/components/chat/PromptbasePopover';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { triggerHaptic } from '@/hooks/useDeviceCapability';
 
 // Re-export ChatAttachment for backward compatibility
 export type { ChatAttachment } from '@/types';
@@ -42,6 +44,14 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice input
+  const { isListening, isSupported: voiceSupported, toggleListening, transcript } = useVoiceInput({
+    onTranscript: (text) => {
+      setInput(prev => prev ? `${prev} ${text}` : text);
+      triggerHaptic('light');
+    },
+  });
 
   const handleSubmit = () => {
     if ((input.trim() || attachments.length > 0) && !isLoading) {
@@ -183,41 +193,68 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
           />
           
           <div className="flex items-center justify-between mt-2 border-t border-border pt-3 gap-2">
-            {/* Left side: Attachment, Modes, and Promptbase */}
+            {/* Left side: Attachment, Voice, Modes, and Promptbase */}
             <div className="flex items-center gap-1">
               {/* Attachment */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     onClick={handleAttachment}
-                    className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-target"
                     aria-label="Attach file"
                   >
-                    <Paperclip size={18} />
+                    <Paperclip size={20} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Attach file</TooltipContent>
               </Tooltip>
 
+              {/* Voice Input */}
+              {voiceSupported && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => {
+                        triggerHaptic('medium');
+                        toggleListening();
+                      }}
+                      className={cn(
+                        "p-2.5 rounded-lg transition-all touch-target relative",
+                        isListening
+                          ? "text-primary bg-primary/20"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      )}
+                      aria-label={isListening ? "Stop listening" : "Voice input"}
+                    >
+                      <Mic size={20} />
+                      {isListening && (
+                        <span className="absolute inset-0 rounded-lg border-2 border-primary animate-pulse-ring" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{isListening ? "Listening..." : "Voice input"}</TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Research Mode - Icon only when unselected, icon + text when selected */}
               {mode === 'research' ? (
                 <button
                   onClick={() => toggleMode('research')}
-                  className="px-3 py-1.5 h-8 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-primary/20 text-primary border border-primary/30 transition-all"
+                  className="px-3 py-1.5 h-10 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-primary/20 text-primary border border-primary/30 transition-all touch-target"
                   aria-label="Research mode active"
                 >
-                  <Search size={16} />
-                  <span>Research</span>
+                  <Search size={18} />
+                  <span className="hidden sm:inline">Research</span>
                 </button>
               ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => toggleMode('research')}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                      className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-target"
                       aria-label="Enable Research mode"
                     >
-                      <Search size={18} />
+                      <Search size={20} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Research mode</TooltipContent>
@@ -228,21 +265,21 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
               {mode === 'thinking' ? (
                 <button
                   onClick={() => toggleMode('thinking')}
-                  className="px-3 py-1.5 h-8 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-primary/20 text-primary border border-primary/30 transition-all"
+                  className="px-3 py-1.5 h-10 rounded-lg text-sm font-medium flex items-center gap-1.5 bg-primary/20 text-primary border border-primary/30 transition-all touch-target"
                   aria-label="Thinking mode active"
                 >
-                  <Brain size={16} />
-                  <span>Thinking</span>
+                  <Brain size={18} />
+                  <span className="hidden sm:inline">Thinking</span>
                 </button>
               ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => toggleMode('thinking')}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                      className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors touch-target"
                       aria-label="Enable Thinking mode"
                     >
-                      <Brain size={18} />
+                      <Brain size={20} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Thinking mode</TooltipContent>
@@ -280,16 +317,21 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Send Button - Rectangular to match theme */}
+              {/* Send Button - Touch-friendly */}
               <button 
-                onClick={handleSubmit}
+                onClick={() => {
+                  triggerHaptic('medium');
+                  handleSubmit();
+                }}
                 disabled={(!input.trim() && attachments.length === 0) || isLoading}
                 className={cn(
-                  "h-10 px-4 rounded-lg bg-gradient-to-b from-primary to-primary/60 flex items-center justify-center text-primary-foreground shadow-lg transition-all",
-                  (input.trim() || attachments.length > 0) && !isLoading ? "hover:brightness-110" : "opacity-50 cursor-not-allowed"
+                  "h-11 w-11 md:w-auto md:px-5 rounded-xl bg-gradient-to-b from-primary to-primary/60 flex items-center justify-center text-primary-foreground shadow-lg transition-all touch-target",
+                  (input.trim() || attachments.length > 0) && !isLoading 
+                    ? "hover:brightness-110 active:scale-95" 
+                    : "opacity-50 cursor-not-allowed"
                 )}
               >
-                <Send size={18} />
+                <Send size={20} />
               </button>
             </div>
           </div>
