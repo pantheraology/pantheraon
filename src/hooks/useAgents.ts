@@ -198,7 +198,10 @@ export const useAgent = (agentId: string | null) => {
         models: models.data || [],
         capabilities: capabilities.data || [],
         knowledge: knowledge.data || [],
-        actions: actions.data || [],
+        actions: (actions.data || []).map(a => ({
+          ...a,
+          config: (typeof a.config === 'object' && a.config !== null ? a.config : null) as AgentAction['config'],
+        })),
       });
     } catch (error) {
       console.error('Error fetching agent:', error);

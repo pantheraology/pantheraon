@@ -1,3 +1,4 @@
+// Discover page category configuration
 import { Sparkles, Zap, Globe, BookOpen, Music, LucideIcon } from 'lucide-react';
 
 export interface DiscoverCategory {
@@ -7,7 +8,7 @@ export interface DiscoverCategory {
   color: string;
 }
 
-export const discoverCategories: DiscoverCategory[] = [
+export const DISCOVER_CATEGORIES: DiscoverCategory[] = [
   { 
     icon: Sparkles, 
     title: 'Creative Writing', 

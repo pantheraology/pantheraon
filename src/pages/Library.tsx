@@ -6,6 +6,7 @@ import { ConversationCard } from '@/components/cards/ConversationCard';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { EmptyState } from '@/components/common/EmptyState';
 import { PageContainer } from '@/components/layout/PageContainer';
+import { ConversationSkeleton } from '@/components/common/LoadingSkeleton';
 
 const Library = () => {
   const { conversations, isLoading: conversationsLoading, deleteConversation } = useConversations();
@@ -56,21 +57,7 @@ const Library = () => {
       {/* Conversations List */}
       <div className="space-y-3">
         {conversationsLoading ? (
-          // Loading skeleton
-          <>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="glass rounded-xl p-4 animate-pulse">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-muted" />
-                  <div className="flex-1">
-                    <div className="h-5 bg-muted rounded w-1/3 mb-2" />
-                    <div className="h-4 bg-muted rounded w-2/3 mb-2" />
-                    <div className="h-3 bg-muted rounded w-1/4" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>
+          <ConversationSkeleton count={3} />
         ) : filteredConversations.length === 0 ? (
           <EmptyState
             icon={MessageSquare}

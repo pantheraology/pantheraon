@@ -10,7 +10,7 @@ import { Users, Plus, Search } from 'lucide-react';
 import { CreateGroupDialog } from '@/components/groups/CreateGroupDialog';
 import { GroupChatCard } from '@/components/groups/GroupChatCard';
 import { GroupChatView } from '@/components/groups/GroupChatView';
-import { Skeleton } from '@/components/ui/skeleton';
+import { GridSkeleton } from '@/components/common/LoadingSkeleton';
 
 const Groups = () => {
   const { isSignedIn, isLoaded } = useAuthGuard();
@@ -77,11 +77,7 @@ const Groups = () => {
 
       {/* Content */}
       {isLoading || authLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-lg" />
-          ))}
-        </div>
+        <GridSkeleton count={3} />
       ) : filteredGroups.length === 0 ? (
         <EmptyState
           icon={Users}

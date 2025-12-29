@@ -140,7 +140,7 @@ serve(async (req) => {
         messages: [
           { 
             role: "system", 
-            content: `You are Ombrion AI, an intelligent and helpful assistant. You provide clear, accurate, and thoughtful responses to user questions. 
+            content: `You are ${Deno.env.get("AI_NAME") || "Ombrion"}, an intelligent and helpful assistant. You provide clear, accurate, and thoughtful responses to user questions. 
 
 Key traits:
 - Be conversational and friendly, but professional

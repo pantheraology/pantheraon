@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export interface StudioGeneration {
   id: string;
@@ -15,7 +15,6 @@ export interface StudioGeneration {
 
 export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [generations, setGenerations] = useState<StudioGeneration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,15 +42,11 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
       setGenerations((data as StudioGeneration[]) || []);
     } catch (error) {
       console.error('Error fetching generations:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load your generations',
-        variant: 'destructive',
-      });
+      toast.error('Failed to load your generations');
     } finally {
       setIsLoading(false);
     }
-  }, [user, type, toast]);
+  }, [user, type]);
 
   useEffect(() => {
     fetchGenerations();
@@ -83,18 +78,10 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
       if (error) throw error;
 
       setGenerations(prev => prev.filter(g => g.id !== id));
-      
-      toast({
-        title: 'Deleted',
-        description: 'Generation removed successfully',
-      });
+      toast.success('Generation removed successfully');
     } catch (error) {
       console.error('Error deleting generation:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete generation',
-        variant: 'destructive',
-      });
+      toast.error('Failed to delete generation');
     }
   };
 

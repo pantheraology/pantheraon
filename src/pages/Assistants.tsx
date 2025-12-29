@@ -10,7 +10,7 @@ import { Bot, Plus, Search } from 'lucide-react';
 import { CreateAgentDialog } from '@/components/agents/CreateAgentDialog';
 import { AgentCard } from '@/components/agents/AgentCard';
 import { AgentBuilder } from '@/components/agents/AgentBuilder';
-import { Skeleton } from '@/components/ui/skeleton';
+import { GridSkeleton } from '@/components/common/LoadingSkeleton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -98,11 +98,7 @@ const Assistants = () => {
 
       {/* Content */}
       {isLoading || authLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-32 rounded-lg" />
-          ))}
-        </div>
+        <GridSkeleton count={3} />
       ) : filteredAssistants.length === 0 ? (
         <EmptyState
           icon={Bot}

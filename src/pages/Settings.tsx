@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Palette, Shield, Camera, Check, Loader2 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme, ThemeName } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
+import { THEMES } from '@/config/themes';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,13 +23,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-
-const themes: { id: ThemeName; name: string; color: string }[] = [
-  { id: 'space-blue', name: 'Space Blue', color: 'hsl(220, 90%, 50%)' },
-  { id: 'neon-orange', name: 'Neon Orange', color: 'hsl(14, 100%, 50%)' },
-  { id: 'cyber-yellow', name: 'Cyber Yellow', color: 'hsl(75, 100%, 50%)' },
-  { id: 'aqua-cyan', name: 'Aqua Cyan', color: 'hsl(187, 94%, 43%)' },
-];
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -219,7 +213,7 @@ const Settings = () => {
               Choose your preferred color theme
             </p>
             <div className="flex flex-wrap gap-4">
-              {themes.map((t) => (
+              {THEMES.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTheme(t.id)}
