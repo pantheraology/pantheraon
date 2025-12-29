@@ -1,4 +1,4 @@
-import { MessageSquare, Compass, LayoutGrid, Library, Users, Bot, Sparkles, LucideIcon } from 'lucide-react';
+import { MessageSquare, Compass, LayoutGrid, Library, Users, Bot, Sparkles, Palette, LucideIcon } from 'lucide-react';
 
 export interface NavItem {
   icon: LucideIcon;
@@ -14,6 +14,7 @@ export const navItems: NavItem[] = [
   { icon: Users, label: 'Group Chat', path: '/groups', requiresAuth: true },
   { icon: Bot, label: 'AGENT', path: '/agent', requiresAuth: true, isDynamic: true },
   { icon: Sparkles, label: 'Assistants', path: '/assistants', requiresAuth: true },
+  { icon: Palette, label: 'Studio', path: '/studio', requiresAuth: true },
   { icon: LayoutGrid, label: 'Spaces', path: '/spaces', requiresAuth: true },
   { icon: Library, label: 'Library', path: '/library', requiresAuth: true },
 ];

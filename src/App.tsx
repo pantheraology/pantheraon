@@ -18,6 +18,7 @@ const Discover = lazy(() => import("./pages/Discover"));
 const Groups = lazy(() => import("./pages/Groups"));
 const Agent = lazy(() => import("./pages/Agent"));
 const Assistants = lazy(() => import("./pages/Assistants"));
+const Studio = lazy(() => import("./pages/Studio"));
 const Spaces = lazy(() => import("./pages/Spaces"));
 const Library = lazy(() => import("./pages/Library"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -53,6 +54,7 @@ const AppContent = () => {
             <Route path="/groups" element={<Groups />} />
             <Route path="/agent" element={<Agent />} />
             <Route path="/assistants" element={<Assistants />} />
+            <Route path="/studio" element={<Studio />} />
             <Route path="/spaces" element={<Spaces />} />
             <Route path="/library" element={<Library />} />
             <Route path="/settings" element={<Settings />} />
