@@ -143,12 +143,12 @@ export const useGroupChats = () => {
     }
 
     try {
-      // Try to find user by username first (using safe parameterized query)
-      let targetUser: { id: string; username: string | null; email: string | null } | null = null;
+      // Find user by username only (email is no longer stored in profiles for privacy)
+      let targetUser: { id: string; username: string | null } | null = null;
       
       const { data: userByUsername, error: usernameError } = await supabase
         .from('profiles')
-        .select('id, username, email')
+        .select('id, username')
         .eq('username', sanitizedIdentifier)
         .maybeSingle();
 
@@ -156,16 +156,6 @@ export const useGroupChats = () => {
       
       if (userByUsername) {
         targetUser = userByUsername;
-      } else {
-        // If not found by username, try email (using safe parameterized query)
-        const { data: userByEmail, error: emailError } = await supabase
-          .from('profiles')
-          .select('id, username, email')
-          .eq('email', sanitizedIdentifier)
-          .maybeSingle();
-
-        if (emailError) throw emailError;
-        targetUser = userByEmail;
       }
 
       if (!targetUser) {
