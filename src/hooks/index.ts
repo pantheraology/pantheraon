@@ -9,6 +9,8 @@ export { useToast, toast } from './use-toast';
 export { useAgents, useAgent } from './useAgents';
 export { useGroupChats, useGroupChat } from './useGroupChats';
 export { useStudioGenerations } from './useStudioGenerations';
+export { useDebounce } from './useDebounce';
+export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 // Re-export types for convenience
 export type { Conversation, Space, Message } from '@/types';
