@@ -17,6 +17,7 @@ export type Database = {
       conversations: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
           id: string
           space_id: string | null
           title: string
@@ -25,6 +26,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
           id?: string
           space_id?: string | null
           title: string
@@ -33,6 +35,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
           id?: string
           space_id?: string | null
           title?: string
@@ -88,6 +91,7 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          theme_preference: string | null
           updated_at: string | null
         }
         Insert: {
@@ -96,6 +100,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          theme_preference?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -104,6 +109,7 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          theme_preference?: string | null
           updated_at?: string | null
         }
         Relationships: []

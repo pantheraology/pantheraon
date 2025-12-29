@@ -12,6 +12,7 @@ export interface Conversation {
   createdAt: Date;
   updatedAt: Date;
   spaceId: string | null;
+  deletedAt?: Date | null;
 }
 
 export interface Space {
