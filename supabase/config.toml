@@ -1,10 +1,10 @@
 project_id = "urjzuydkyjgvzbmeaugx"
 
 [functions.chat]
-verify_jwt = true
+verify_jwt = false
 
 [functions.studio-image]
-verify_jwt = true
+verify_jwt = false
 
 [functions.delete-account]
-verify_jwt = true
+verify_jwt = false
