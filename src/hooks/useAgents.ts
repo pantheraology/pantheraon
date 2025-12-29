@@ -12,13 +12,17 @@ import {
 } from '@/types/agent';
 import { toast } from 'sonner';
 
+const PAGE_SIZE = 50;
+
 export const useAgents = () => {
   const { user } = useAuth();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [mainAgent, setMainAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
 
-  const fetchAgents = useCallback(async () => {
+  const fetchAgents = useCallback(async (reset: boolean = true) => {
     if (!user) {
       setAgents([]);
       setMainAgent(null);
@@ -27,16 +31,28 @@ export const useAgents = () => {
     }
 
     try {
+      const currentPage = reset ? 0 : page;
+      
       const { data, error } = await supabase
         .from('agents')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
       if (error) throw error;
 
       const agentsList = data || [];
-      setAgents(agentsList);
+      setHasMore(agentsList.length === PAGE_SIZE);
+      
+      if (reset) {
+        setAgents(agentsList);
+        setPage(1);
+      } else {
+        setAgents(prev => [...prev, ...agentsList]);
+        setPage(currentPage + 1);
+      }
+      
       setMainAgent(agentsList.find(a => a.is_main) || null);
     } catch (error) {
       console.error('Error fetching agents:', error);
@@ -44,11 +60,17 @@ export const useAgents = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, page]);
 
   useEffect(() => {
-    fetchAgents();
-  }, [fetchAgents]);
+    fetchAgents(true);
+  }, [user]);
+
+  const loadMore = useCallback(async () => {
+    if (hasMore && !isLoading) {
+      await fetchAgents(false);
+    }
+  }, [hasMore, isLoading, fetchAgents]);
 
   const createAgent = async (
     name: string, 
@@ -86,7 +108,7 @@ export const useAgents = () => {
       if (error) throw error;
 
       toast.success(`Agent "${name}" created!`);
-      await fetchAgents();
+      await fetchAgents(true);
       return data;
     } catch (error) {
       console.error('Error creating agent:', error);
@@ -100,6 +122,12 @@ export const useAgents = () => {
     updates: Partial<Pick<Agent, 'name' | 'description' | 'instructions' | 'is_main'>>
   ): Promise<boolean> => {
     if (!user) return false;
+
+    // Optimistic update
+    const originalAgent = agents.find(a => a.id === agentId);
+    if (originalAgent) {
+      setAgents(prev => prev.map(a => a.id === agentId ? { ...a, ...updates } : a));
+    }
 
     try {
       // If setting as main, unset any existing main
@@ -119,10 +147,14 @@ export const useAgents = () => {
       if (error) throw error;
 
       toast.success('Agent updated!');
-      await fetchAgents();
+      await fetchAgents(true);
       return true;
     } catch (error) {
+      // Rollback on failure
       console.error('Error updating agent:', error);
+      if (originalAgent) {
+        setAgents(prev => prev.map(a => a.id === agentId ? originalAgent : a));
+      }
       toast.error('Failed to update agent');
       return false;
     }
@@ -130,6 +162,10 @@ export const useAgents = () => {
 
   const deleteAgent = async (agentId: string): Promise<boolean> => {
     if (!user) return false;
+
+    // Optimistic update
+    const originalAgent = agents.find(a => a.id === agentId);
+    setAgents(prev => prev.filter(a => a.id !== agentId));
 
     try {
       const { error } = await supabase
@@ -140,10 +176,13 @@ export const useAgents = () => {
       if (error) throw error;
 
       toast.success('Agent deleted');
-      await fetchAgents();
       return true;
     } catch (error) {
+      // Rollback on failure
       console.error('Error deleting agent:', error);
+      if (originalAgent) {
+        setAgents(prev => [originalAgent, ...prev]);
+      }
       toast.error('Failed to delete agent');
       return false;
     }
@@ -153,10 +192,12 @@ export const useAgents = () => {
     agents,
     mainAgent,
     isLoading,
+    hasMore,
     createAgent,
     updateAgent,
     deleteAgent,
-    refreshAgents: fetchAgents,
+    loadMore,
+    refreshAgents: () => fetchAgents(true),
   };
 };
 
@@ -234,6 +275,15 @@ export const useAgent = (agentId: string | null) => {
   };
 
   const removeConversationStarter = async (starterId: string) => {
+    // Optimistic update
+    const originalStarters = agent?.conversation_starters || [];
+    if (agent) {
+      setAgent({
+        ...agent,
+        conversation_starters: originalStarters.filter(s => s.id !== starterId),
+      });
+    }
+
     try {
       const { error } = await supabase
         .from('agent_conversation_starters')
@@ -241,9 +291,12 @@ export const useAgent = (agentId: string | null) => {
         .eq('id', starterId);
       
       if (error) throw error;
-      await fetchAgent();
     } catch (error) {
+      // Rollback on failure
       console.error('Error removing starter:', error);
+      if (agent) {
+        setAgent({ ...agent, conversation_starters: originalStarters });
+      }
       toast.error('Failed to remove conversation starter');
     }
   };
@@ -330,6 +383,15 @@ export const useAgent = (agentId: string | null) => {
   };
 
   const removeKnowledge = async (knowledgeId: string, filePath: string) => {
+    // Optimistic update
+    const originalKnowledge = agent?.knowledge || [];
+    if (agent) {
+      setAgent({
+        ...agent,
+        knowledge: originalKnowledge.filter(k => k.id !== knowledgeId),
+      });
+    }
+
     try {
       await supabase.storage.from('agent-knowledge').remove([filePath]);
       const { error } = await supabase.from('agent_knowledge').delete().eq('id', knowledgeId);
@@ -337,9 +399,12 @@ export const useAgent = (agentId: string | null) => {
       if (error) throw error;
       
       toast.success('File removed');
-      await fetchAgent();
     } catch (error) {
+      // Rollback on failure
       console.error('Error removing knowledge:', error);
+      if (agent) {
+        setAgent({ ...agent, knowledge: originalKnowledge });
+      }
       toast.error('Failed to remove file');
     }
   };

@@ -13,12 +13,16 @@ export interface StudioGeneration {
   created_at: string;
 }
 
+const PAGE_SIZE = 30;
+
 export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
   const { user } = useAuth();
   const [generations, setGenerations] = useState<StudioGeneration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
 
-  const fetchGenerations = useCallback(async () => {
+  const fetchGenerations = useCallback(async (reset: boolean = true) => {
     if (!user) {
       setGenerations([]);
       setIsLoading(false);
@@ -26,11 +30,14 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
     }
 
     try {
+      const currentPage = reset ? 0 : page;
+      
       let query = supabase
         .from('studio_generations')
         .select('*')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
       if (type) {
         query = query.eq('type', type);
@@ -39,26 +46,43 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setGenerations((data as StudioGeneration[]) || []);
+      
+      const generationsList = (data as StudioGeneration[]) || [];
+      setHasMore(generationsList.length === PAGE_SIZE);
+      
+      if (reset) {
+        setGenerations(generationsList);
+        setPage(1);
+      } else {
+        setGenerations(prev => [...prev, ...generationsList]);
+        setPage(currentPage + 1);
+      }
     } catch (error) {
       console.error('Error fetching generations:', error);
       toast.error('Failed to load your generations');
     } finally {
       setIsLoading(false);
     }
-  }, [user, type]);
+  }, [user, type, page]);
 
   useEffect(() => {
-    fetchGenerations();
-  }, [fetchGenerations]);
+    fetchGenerations(true);
+  }, [user, type]);
+
+  const loadMore = useCallback(async () => {
+    if (hasMore && !isLoading) {
+      await fetchGenerations(false);
+    }
+  }, [hasMore, isLoading, fetchGenerations]);
 
   const deleteGeneration = async (id: string) => {
     if (!user) return;
 
+    // Optimistic update
+    const generation = generations.find(g => g.id === id);
+    setGenerations(prev => prev.filter(g => g.id !== id));
+
     try {
-      // Find the generation to get the file path
-      const generation = generations.find(g => g.id === id);
-      
       // Delete from storage if we have the URL
       if (generation?.result_url) {
         const urlParts = generation.result_url.split('/studio-assets/');
@@ -77,10 +101,13 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
 
       if (error) throw error;
 
-      setGenerations(prev => prev.filter(g => g.id !== id));
       toast.success('Generation removed successfully');
     } catch (error) {
+      // Rollback on failure
       console.error('Error deleting generation:', error);
+      if (generation) {
+        setGenerations(prev => [generation, ...prev]);
+      }
       toast.error('Failed to delete generation');
     }
   };
@@ -92,8 +119,10 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
   return {
     generations,
     isLoading,
+    hasMore,
     deleteGeneration,
     addGeneration,
-    refetch: fetchGenerations,
+    loadMore,
+    refetch: () => fetchGenerations(true),
   };
 };

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 import { 
   Bot, 
   Sparkles, 
@@ -83,9 +84,17 @@ export const AgentBuilder = ({ agentId, onBack }: AgentBuilderProps) => {
     }
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Client-side file size validation
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`File too large. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}.`);
+        e.target.value = '';
+        return;
+      }
       uploadKnowledge(file);
       e.target.value = '';
     }

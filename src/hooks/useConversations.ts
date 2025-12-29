@@ -22,14 +22,25 @@ interface DbMessage {
   created_at: string;
 }
 
+const PAGE_SIZE = 50;
+
+// Helper to truncate title with ellipsis
+const truncateTitle = (content: string, maxLength: number = 50): string => {
+  if (content.length <= maxLength) return content;
+  return content.slice(0, maxLength - 1) + '…';
+};
+
 export const useConversations = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [deletedConversations, setDeletedConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
 
   // Fetch conversations with messages from database
-  const fetchConversations = useCallback(async () => {
+  const fetchConversations = useCallback(async (reset: boolean = true) => {
     if (!user) {
       setConversations([]);
       setDeletedConversations([]);
@@ -38,13 +49,24 @@ export const useConversations = () => {
     }
 
     try {
-      // Fetch all conversations (both active and deleted)
+      const currentPage = reset ? 0 : page;
+      
+      // Fetch paginated conversations (both active and deleted)
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select('*')
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
       if (convError) throw convError;
+
+      // Check if we have more data
+      setHasMore((convData?.length || 0) === PAGE_SIZE);
+      if (!reset) {
+        setPage(currentPage + 1);
+      } else {
+        setPage(1);
+      }
 
       // Fetch all messages for these conversations
       const conversationIds = (convData as DbConversation[]).map((c) => c.id);
@@ -74,7 +96,7 @@ export const useConversations = () => {
         });
       }
 
-      const allConversations: Conversation[] = (convData as DbConversation[]).map((c) => ({
+      const newConversations: Conversation[] = (convData as DbConversation[]).map((c) => ({
         id: c.id,
         title: c.title,
         messages: messagesMap[c.id] || [],
@@ -84,20 +106,32 @@ export const useConversations = () => {
         deletedAt: c.deleted_at ? new Date(c.deleted_at) : null,
       }));
 
-      // Split into active and deleted
-      setConversations(allConversations.filter((c) => !c.deletedAt));
-      setDeletedConversations(allConversations.filter((c) => c.deletedAt));
+      if (reset) {
+        // Split into active and deleted
+        setConversations(newConversations.filter((c) => !c.deletedAt));
+        setDeletedConversations(newConversations.filter((c) => c.deletedAt));
+      } else {
+        // Append to existing
+        setConversations(prev => [...prev, ...newConversations.filter((c) => !c.deletedAt)]);
+        setDeletedConversations(prev => [...prev, ...newConversations.filter((c) => c.deletedAt)]);
+      }
     } catch (error) {
       console.error('Failed to fetch conversations:', error);
       toast.error('Failed to load conversations');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, page]);
 
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    fetchConversations(true);
+  }, [user]); // Only refetch when user changes
+
+  const loadMore = useCallback(async () => {
+    if (hasMore && !isLoading) {
+      await fetchConversations(false);
+    }
+  }, [hasMore, isLoading, fetchConversations]);
 
   const saveConversation = useCallback(async (
     messages: Message[],
@@ -105,8 +139,9 @@ export const useConversations = () => {
   ): Promise<string | null> => {
     if (!user) return null;
 
-    const title = messages[0]?.content.slice(0, 50) || 'New Conversation';
+    const title = truncateTitle(messages[0]?.content || 'New Conversation');
 
+    setIsSaving(true);
     try {
       if (existingId) {
         // Update existing conversation
@@ -198,12 +233,22 @@ export const useConversations = () => {
       console.error('Failed to save conversation:', error);
       toast.error('Failed to save conversation');
       return null;
+    } finally {
+      setIsSaving(false);
     }
   }, [user]);
 
-  // Soft delete - move to trash
+  // Soft delete - move to trash with undo option
   const deleteConversation = useCallback(async (id: string) => {
     if (!user) return;
+
+    // Optimistically update UI
+    const conversation = conversations.find((c) => c.id === id);
+    if (!conversation) return;
+
+    const deletedConv = { ...conversation, deletedAt: new Date() };
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    setDeletedConversations((prev) => [deletedConv, ...prev]);
 
     try {
       const { error } = await supabase
@@ -212,18 +257,22 @@ export const useConversations = () => {
         .eq('id', id);
 
       if (error) throw error;
-
-      // Move from active to deleted
-      const conversation = conversations.find((c) => c.id === id);
-      if (conversation) {
-        const deletedConv = { ...conversation, deletedAt: new Date() };
-        setConversations((prev) => prev.filter((c) => c.id !== id));
-        setDeletedConversations((prev) => [deletedConv, ...prev]);
-      }
       
-      toast.success('Chat moved to trash');
+      // Show undo toast
+      toast('Chat moved to trash', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            await restoreConversation(id);
+          },
+        },
+        duration: 5000,
+      });
     } catch (error) {
+      // Rollback on failure
       console.error('Failed to delete conversation:', error);
+      setConversations((prev) => [conversation, ...prev]);
+      setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
       toast.error('Failed to delete conversation');
     }
   }, [user, conversations]);
@@ -232,6 +281,14 @@ export const useConversations = () => {
   const restoreConversation = useCallback(async (id: string) => {
     if (!user) return;
 
+    // Optimistically update UI
+    const conversation = deletedConversations.find((c) => c.id === id);
+    if (!conversation) return;
+
+    const restoredConv = { ...conversation, deletedAt: null };
+    setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
+    setConversations((prev) => [restoredConv, ...prev]);
+
     try {
       const { error } = await supabase
         .from('conversations')
@@ -239,18 +296,13 @@ export const useConversations = () => {
         .eq('id', id);
 
       if (error) throw error;
-
-      // Move from deleted to active
-      const conversation = deletedConversations.find((c) => c.id === id);
-      if (conversation) {
-        const restoredConv = { ...conversation, deletedAt: null };
-        setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
-        setConversations((prev) => [restoredConv, ...prev]);
-      }
       
       toast.success('Chat restored');
     } catch (error) {
+      // Rollback on failure
       console.error('Failed to restore conversation:', error);
+      setDeletedConversations((prev) => [conversation, ...prev]);
+      setConversations((prev) => prev.filter((c) => c.id !== id));
       toast.error('Failed to restore conversation');
     }
   }, [user, deletedConversations]);
@@ -259,6 +311,10 @@ export const useConversations = () => {
   const permanentlyDeleteConversation = useCallback(async (id: string) => {
     if (!user) return;
 
+    // Optimistically update UI
+    const conversation = deletedConversations.find((c) => c.id === id);
+    setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
+
     try {
       const { error } = await supabase
         .from('conversations')
@@ -266,14 +322,17 @@ export const useConversations = () => {
         .eq('id', id);
 
       if (error) throw error;
-
-      setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
+      
       toast.success('Chat permanently deleted');
     } catch (error) {
+      // Rollback on failure
       console.error('Failed to permanently delete conversation:', error);
+      if (conversation) {
+        setDeletedConversations((prev) => [conversation, ...prev]);
+      }
       toast.error('Failed to delete conversation');
     }
-  }, [user]);
+  }, [user, deletedConversations]);
 
   const getConversation = useCallback((id: string): Conversation | undefined => {
     return conversations.find((c) => c.id === id);
@@ -282,6 +341,12 @@ export const useConversations = () => {
   const moveToSpace = useCallback(async (conversationId: string, spaceId: string | null) => {
     if (!user) return;
 
+    // Optimistic update
+    const originalConv = conversations.find(c => c.id === conversationId);
+    setConversations((prev) =>
+      prev.map((c) => (c.id === conversationId ? { ...c, spaceId } : c))
+    );
+
     try {
       const { error } = await supabase
         .from('conversations')
@@ -289,15 +354,17 @@ export const useConversations = () => {
         .eq('id', conversationId);
 
       if (error) throw error;
-
-      setConversations((prev) =>
-        prev.map((c) => (c.id === conversationId ? { ...c, spaceId } : c))
-      );
     } catch (error) {
+      // Rollback on failure
       console.error('Failed to move conversation:', error);
+      if (originalConv) {
+        setConversations((prev) =>
+          prev.map((c) => (c.id === conversationId ? originalConv : c))
+        );
+      }
       toast.error('Failed to move conversation');
     }
-  }, [user]);
+  }, [user, conversations]);
 
   const getConversationsBySpace = useCallback((spaceId: string | null): Conversation[] => {
     if (spaceId === null) {
@@ -310,6 +377,8 @@ export const useConversations = () => {
     conversations,
     deletedConversations,
     isLoading,
+    isSaving,
+    hasMore,
     saveConversation,
     deleteConversation,
     restoreConversation,
@@ -317,6 +386,7 @@ export const useConversations = () => {
     getConversation,
     moveToSpace,
     getConversationsBySpace,
-    refetch: fetchConversations,
+    loadMore,
+    refetch: () => fetchConversations(true),
   };
 };
