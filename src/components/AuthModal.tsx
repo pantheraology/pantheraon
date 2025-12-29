@@ -29,7 +29,7 @@ export const AuthModal = ({ isOpen, onClose, message }: AuthModalProps) => {
 
         <div className="flex flex-col gap-3 mt-4">
           <Link
-            to="/sign-up"
+            to="/auth"
             onClick={onClose}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium hover:brightness-110 transition-all"
           >
@@ -38,7 +38,7 @@ export const AuthModal = ({ isOpen, onClose, message }: AuthModalProps) => {
           </Link>
 
           <Link
-            to="/sign-in"
+            to="/auth"
             onClick={onClose}
             className="flex items-center justify-center gap-2 w-full py-3 rounded-lg bg-muted/50 border border-border text-foreground font-medium hover:bg-muted transition-all"
           >

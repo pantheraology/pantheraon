@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { BRAND } from '@/config/brand';
 
 const emailSchema = z.string().trim().email({ message: 'Invalid email address' });
 const passwordSchema = z.string().min(6, { message: 'Password must be at least 6 characters' });
@@ -116,8 +117,8 @@ const Auth = () => {
           </h1>
           <p className="text-muted-foreground">
             {mode === 'signin' 
-              ? 'Sign in to continue to PantheraON' 
-              : 'Join PantheraON and start exploring'}
+              ? `Sign in to continue to ${BRAND.APP_NAME}` 
+              : `Join ${BRAND.APP_NAME} and start exploring`}
           </p>
         </div>
 
