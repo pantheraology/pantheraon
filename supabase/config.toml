@@ -1,7 +1,7 @@
 project_id = "urjzuydkyjgvzbmeaugx"
 
 [functions.chat]
-verify_jwt = false
+verify_jwt = true
 
 [functions.public-config]
 verify_jwt = false
