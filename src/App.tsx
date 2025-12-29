@@ -68,6 +68,7 @@ const AppContent = () => {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/chat/:conversationId" element={<Index />} />
             <Route path="/discover" element={<Discover />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/agent" element={<Agent />} />

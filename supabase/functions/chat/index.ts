@@ -18,6 +18,7 @@ interface RequestBody {
   messages: ChatMessage[];
   mode?: ChatMode;
   model?: string;
+  agentId?: string;
 }
 
 function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; error?: string } {
@@ -79,7 +80,7 @@ function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; 
     return { valid: false, error: 'Invalid mode. Must be normal, research, or thinking' };
   }
 
-  // Validate model
+  // Validate model - include Anthropic models
   const model = (requestBody.model as string) || 'google/gemini-2.5-flash';
   const validModels = [
     'google/gemini-2.5-flash',
@@ -87,6 +88,8 @@ function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; 
     'google/gemini-2.5-flash-lite',
     'openai/gpt-5',
     'openai/gpt-5-mini',
+    'anthropic/claude-sonnet-4-5',
+    'anthropic/claude-opus-4-5',
   ];
   if (!validModels.includes(model)) {
     return { valid: false, error: 'Invalid model' };
@@ -98,14 +101,15 @@ function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; 
       messages: validatedMessages,
       mode,
       model,
+      agentId: requestBody.agentId as string | undefined,
     } 
   };
 }
 
-function getSystemPrompt(mode: ChatMode): string {
+function getSystemPrompt(mode: ChatMode, agentInstructions?: string): string {
   const baseName = Deno.env.get("AI_NAME") || "Ombrion";
   
-  const basePrompt = `You are ${baseName}, an intelligent and helpful assistant. You provide clear, accurate, and thoughtful responses to user questions.
+  let basePrompt = `You are ${baseName}, an intelligent and helpful assistant. You provide clear, accurate, and thoughtful responses to user questions.
 
 Key traits:
 - Be conversational and friendly, but professional
@@ -113,6 +117,11 @@ Key traits:
 - Use markdown formatting for better readability when it helps
 - If you don't know something, be honest about it
 - Be helpful with a wide range of topics including research, current events, health, parenting, sports, and more`;
+
+  // Prepend agent instructions if available
+  if (agentInstructions) {
+    basePrompt = `${agentInstructions}\n\n${basePrompt}`;
+  }
 
   if (mode === 'research') {
     return `${basePrompt}
@@ -182,6 +191,17 @@ function getGoogleModelName(model: string): string {
   }
 }
 
+function getAnthropicModelName(model: string): string {
+  switch (model) {
+    case 'anthropic/claude-sonnet-4-5':
+      return 'claude-sonnet-4-5-20240620';
+    case 'anthropic/claude-opus-4-5':
+      return 'claude-opus-4-5-20251101';
+    default:
+      return 'claude-sonnet-4-5-20240620';
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -230,9 +250,26 @@ serve(async (req) => {
       });
     }
 
-    const { messages, mode, model: requestedModel } = validation.body!;
+    const { messages, mode, model: requestedModel, agentId } = validation.body!;
     const finalModel = getModelForMode(requestedModel!, mode!);
-    const systemPrompt = getSystemPrompt(mode!);
+
+    // Fetch agent instructions if agentId is provided
+    let agentInstructions: string | undefined;
+    if (agentId) {
+      const { data: agent, error: agentError } = await supabaseClient
+        .from('agents')
+        .select('instructions')
+        .eq('id', agentId)
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!agentError && agent?.instructions) {
+        agentInstructions = agent.instructions;
+        console.log("Using agent instructions for agent:", agentId);
+      }
+    }
+
+    const systemPrompt = getSystemPrompt(mode!, agentInstructions);
     
     // Check for user's own API key (BYOK)
     const { data: userApiKeys } = await supabaseClient
@@ -241,11 +278,15 @@ serve(async (req) => {
       .eq('user_id', user.id)
       .eq('is_active', true);
 
-    // Determine if we can use BYOK
-    const provider = finalModel.startsWith('openai/') ? 'openai' : 'google';
+    // Determine provider
+    let provider = 'lovable';
+    if (finalModel.startsWith('openai/')) provider = 'openai';
+    else if (finalModel.startsWith('google/')) provider = 'google';
+    else if (finalModel.startsWith('anthropic/')) provider = 'anthropic';
+
     const userKey = userApiKeys?.find(k => k.provider === provider);
 
-    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${!!userKey}, messages=${messages.length}`);
+    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${!!userKey}, messages=${messages.length}, agentId=${agentId || 'none'}`);
 
     // If user has their own API key for this provider, use it directly
     if (userKey) {
@@ -300,7 +341,7 @@ serve(async (req) => {
       } else if (provider === 'google') {
         // Direct Google AI API call
         const googleModel = getGoogleModelName(finalModel);
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:streamGenerateContent?key=${userKey.api_key}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:streamGenerateContent?key=${userKey.api_key}&alt=sse`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -347,7 +388,6 @@ serve(async (req) => {
           transform(chunk, controller) {
             const text = new TextDecoder().decode(chunk);
             try {
-              // Google sends JSON objects, convert to OpenAI SSE format
               const lines = text.split('\n').filter(line => line.trim());
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
@@ -360,20 +400,81 @@ serve(async (req) => {
                     };
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiFormat)}\n\n`));
                   }
-                } else if (line.trim() && !line.startsWith('[')) {
-                  // Try parsing as JSON directly
-                  try {
-                    const data = JSON.parse(line);
-                    if (data.candidates?.[0]?.content?.parts?.[0]?.text) {
-                      const openaiFormat = {
-                        choices: [{
-                          delta: { content: data.candidates[0].content.parts[0].text }
-                        }]
-                      };
-                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiFormat)}\n\n`));
-                    }
-                  } catch {
-                    // Ignore parsing errors for non-JSON lines
+                }
+              }
+            } catch (e) {
+              console.error("Transform error:", e);
+            }
+          },
+          flush(controller) {
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          }
+        });
+
+        return new Response(response.body?.pipeThrough(transformStream), {
+          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+        });
+      } else if (provider === 'anthropic') {
+        // Direct Anthropic API call
+        const anthropicModel = getAnthropicModelName(finalModel);
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': userKey.api_key,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: anthropicModel,
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: messages.map(m => ({
+              role: m.role,
+              content: m.content,
+            })),
+            stream: true,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Anthropic API error:", response.status, errorText);
+          
+          if (response.status === 401) {
+            return new Response(JSON.stringify({ error: "Invalid Anthropic API key. Please check your API key in Settings." }), {
+              status: 401,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          if (response.status === 429) {
+            return new Response(JSON.stringify({ error: "Anthropic rate limit exceeded. Please try again later." }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+          
+          return new Response(JSON.stringify({ error: "Failed to get AI response from Anthropic" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Transform Anthropic's SSE format to OpenAI-compatible format
+        const transformStream = new TransformStream({
+          transform(chunk, controller) {
+            const text = new TextDecoder().decode(chunk);
+            try {
+              const lines = text.split('\n').filter(line => line.trim());
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = JSON.parse(line.slice(6));
+                  if (data.type === 'content_block_delta' && data.delta?.text) {
+                    const openaiFormat = {
+                      choices: [{
+                        delta: { content: data.delta.text }
+                      }]
+                    };
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(openaiFormat)}\n\n`));
                   }
                 }
               }

@@ -1,10 +1,18 @@
+import { useNavigate } from 'react-router-dom';
 import { Compass } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { DISCOVER_CATEGORIES } from '@/config/discover-categories';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { BRAND } from '@/config/brand';
 
 const Discover = () => {
+  const navigate = useNavigate();
+
+  const handleCategoryClick = (title: string, description: string) => {
+    // Navigate to home with a pre-filled prompt based on the category
+    const prompt = `Help me with ${title.toLowerCase()}: ${description}`;
+    navigate('/', { state: { initialPrompt: prompt } });
+  };
+
   return (
     <PageContainer>
       {/* Header */}
@@ -25,17 +33,17 @@ const Discover = () => {
         {DISCOVER_CATEGORIES.map((category) => {
           const Icon = category.icon;
           return (
-            <Link
+            <button
               key={category.title}
-              to="/"
-              className="glass rounded-xl p-6 hover:border-primary/30 transition-all group"
+              onClick={() => handleCategoryClick(category.title, category.description)}
+              className="glass rounded-xl p-6 hover:border-primary/30 transition-all group text-left"
             >
               <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${category.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                 <Icon size={24} className="text-white" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">{category.title}</h3>
               <p className="text-sm text-muted-foreground">{category.description}</p>
-            </Link>
+            </button>
           );
         })}
       </div>

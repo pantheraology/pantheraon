@@ -3,13 +3,13 @@ import { Message, ChatMode } from '@/types';
 import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
+import { CHAT_TIMEOUT_MS, RATE_LIMIT_DEFAULT_SECONDS } from '@/constants/timing';
 
 export interface ChatOptions {
   mode?: ChatMode;
   model?: string;
+  agentId?: string;
 }
-
-const TIMEOUT_MS = 60000; // 60 second timeout
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -25,7 +25,21 @@ export const useChat = () => {
     }
   }, []);
 
+  const clearRateLimit = useCallback(() => {
+    setRateLimitRetryAt(null);
+  }, []);
+
+  const setInitialMessages = useCallback((initialMessages: Message[]) => {
+    setMessages(initialMessages);
+  }, []);
+
   const sendMessage = useCallback(async (content: string, options?: ChatOptions) => {
+    // Check if rate limited
+    if (rateLimitRetryAt && rateLimitRetryAt > new Date()) {
+      toast.error('Please wait for the rate limit to expire');
+      return;
+    }
+
     // Cancel any existing request
     cancelRequest();
 
@@ -49,7 +63,7 @@ export const useChat = () => {
         abortControllerRef.current.abort();
         toast.error('Request timed out. Please try again.');
       }
-    }, TIMEOUT_MS);
+    }, CHAT_TIMEOUT_MS);
 
     let assistantContent = '';
 
@@ -76,6 +90,7 @@ export const useChat = () => {
           })),
           mode: options?.mode || 'normal',
           model: options?.model || 'google/gemini-2.5-flash',
+          agentId: options?.agentId,
         }),
         signal,
       });
@@ -86,14 +101,11 @@ export const useChat = () => {
         if (resp.status === 429) {
           // Extract retry-after header or default to 60 seconds
           const retryAfter = resp.headers.get('Retry-After');
-          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : 60;
+          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : RATE_LIMIT_DEFAULT_SECONDS;
           const retryAt = new Date(Date.now() + retrySeconds * 1000);
           setRateLimitRetryAt(retryAt);
           
-          toast.error(`Rate limit exceeded. Please wait ${retrySeconds} seconds.`, {
-            duration: 5000,
-            description: `You can try again at ${retryAt.toLocaleTimeString()}`,
-          });
+          toast.error(`Rate limit exceeded. Please wait ${retrySeconds} seconds.`);
         } else if (resp.status === 402) {
           toast.error('Usage limit reached. Please add credits to continue.');
         } else {
@@ -201,7 +213,6 @@ export const useChat = () => {
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         // Request was cancelled - don't show error
-        console.log('Request cancelled');
       } else {
         console.error('Chat error:', error);
         toast.error('Failed to send message. Please try again.');
@@ -211,7 +222,7 @@ export const useChat = () => {
       abortControllerRef.current = null;
       setIsLoading(false);
     }
-  }, [messages, cancelRequest]);
+  }, [messages, cancelRequest, rateLimitRetryAt]);
 
   const clearMessages = useCallback(() => {
     cancelRequest();
@@ -225,5 +236,7 @@ export const useChat = () => {
     clearMessages,
     cancelRequest,
     rateLimitRetryAt,
+    clearRateLimit,
+    setInitialMessages,
   };
 };
