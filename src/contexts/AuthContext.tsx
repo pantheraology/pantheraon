@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -7,6 +7,7 @@ interface Profile {
   email: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  theme_preference: string | null;
 }
 
 interface AuthContextType {
@@ -18,6 +19,8 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) => Promise<{ error: Error | null }>;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,6 +42,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setProfile(data);
     }
   };
+
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      await fetchProfile(user.id);
+    }
+  }, [user]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -114,6 +123,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfile(null);
   };
 
+  const updateProfile = async (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) => {
+    if (!user) {
+      return { error: new Error('Not authenticated') };
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id);
+
+    if (!error) {
+      await fetchProfile(user.id);
+    }
+
+    return { error };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -125,6 +151,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmail,
         signInWithGoogle,
         signOut,
+        updateProfile,
+        refreshProfile,
       }}
     >
       {children}

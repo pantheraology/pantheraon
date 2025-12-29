@@ -11,6 +11,7 @@ interface DbConversation {
   title: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 interface DbMessage {
@@ -24,18 +25,20 @@ interface DbMessage {
 export const useConversations = () => {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [deletedConversations, setDeletedConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch conversations with messages from database
   const fetchConversations = useCallback(async () => {
     if (!user) {
       setConversations([]);
+      setDeletedConversations([]);
       setIsLoading(false);
       return;
     }
 
     try {
-      // Fetch conversations
+      // Fetch all conversations (both active and deleted)
       const { data: convData, error: convError } = await supabase
         .from('conversations')
         .select('*')
@@ -71,16 +74,19 @@ export const useConversations = () => {
         });
       }
 
-      const parsedConversations: Conversation[] = (convData as DbConversation[]).map((c) => ({
+      const allConversations: Conversation[] = (convData as DbConversation[]).map((c) => ({
         id: c.id,
         title: c.title,
         messages: messagesMap[c.id] || [],
         createdAt: new Date(c.created_at),
         updatedAt: new Date(c.updated_at),
         spaceId: c.space_id,
+        deletedAt: c.deleted_at ? new Date(c.deleted_at) : null,
       }));
 
-      setConversations(parsedConversations);
+      // Split into active and deleted
+      setConversations(allConversations.filter((c) => !c.deletedAt));
+      setDeletedConversations(allConversations.filter((c) => c.deletedAt));
     } catch (error) {
       console.error('Failed to fetch conversations:', error);
       toast.error('Failed to load conversations');
@@ -182,6 +188,7 @@ export const useConversations = () => {
           createdAt: new Date(convData.created_at),
           updatedAt: new Date(convData.updated_at),
           spaceId: convData.space_id,
+          deletedAt: null,
         };
 
         setConversations((prev) => [newConversation, ...prev]);
@@ -194,7 +201,62 @@ export const useConversations = () => {
     }
   }, [user]);
 
+  // Soft delete - move to trash
   const deleteConversation = useCallback(async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Move from active to deleted
+      const conversation = conversations.find((c) => c.id === id);
+      if (conversation) {
+        const deletedConv = { ...conversation, deletedAt: new Date() };
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        setDeletedConversations((prev) => [deletedConv, ...prev]);
+      }
+      
+      toast.success('Chat moved to trash');
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      toast.error('Failed to delete conversation');
+    }
+  }, [user, conversations]);
+
+  // Restore from trash
+  const restoreConversation = useCallback(async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ deleted_at: null })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      // Move from deleted to active
+      const conversation = deletedConversations.find((c) => c.id === id);
+      if (conversation) {
+        const restoredConv = { ...conversation, deletedAt: null };
+        setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
+        setConversations((prev) => [restoredConv, ...prev]);
+      }
+      
+      toast.success('Chat restored');
+    } catch (error) {
+      console.error('Failed to restore conversation:', error);
+      toast.error('Failed to restore conversation');
+    }
+  }, [user, deletedConversations]);
+
+  // Permanent delete
+  const permanentlyDeleteConversation = useCallback(async (id: string) => {
     if (!user) return;
 
     try {
@@ -205,9 +267,10 @@ export const useConversations = () => {
 
       if (error) throw error;
 
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+      setDeletedConversations((prev) => prev.filter((c) => c.id !== id));
+      toast.success('Chat permanently deleted');
     } catch (error) {
-      console.error('Failed to delete conversation:', error);
+      console.error('Failed to permanently delete conversation:', error);
       toast.error('Failed to delete conversation');
     }
   }, [user]);
@@ -245,9 +308,12 @@ export const useConversations = () => {
 
   return {
     conversations,
+    deletedConversations,
     isLoading,
     saveConversation,
     deleteConversation,
+    restoreConversation,
+    permanentlyDeleteConversation,
     getConversation,
     moveToSpace,
     getConversationsBySpace,
