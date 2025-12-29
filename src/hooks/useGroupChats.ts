@@ -4,12 +4,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { GroupChat, GroupChatMember, GroupMessage, GroupChatWithMembers } from '@/types/groupChat';
 import { toast } from 'sonner';
 
+const PAGE_SIZE = 50;
+
 export const useGroupChats = () => {
   const { user } = useAuth();
   const [groupChats, setGroupChats] = useState<GroupChatWithMembers[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
 
-  const fetchGroupChats = useCallback(async () => {
+  const fetchGroupChats = useCallback(async (reset: boolean = true) => {
     if (!user) {
       setGroupChats([]);
       setIsLoading(false);
@@ -17,6 +21,8 @@ export const useGroupChats = () => {
     }
 
     try {
+      const currentPage = reset ? 0 : page;
+      
       // Get all groups user is a member of
       const { data: memberships, error: memberError } = await supabase
         .from('group_chat_members')
@@ -33,18 +39,22 @@ export const useGroupChats = () => {
 
       const groupIds = memberships.map(m => m.group_id);
 
-      // Fetch group details
+      // Fetch group details with pagination
       const { data: groups, error: groupError } = await supabase
         .from('group_chats')
         .select('*')
         .in('id', groupIds)
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
 
       if (groupError) throw groupError;
 
+      const groupsList = groups || [];
+      setHasMore(groupsList.length === PAGE_SIZE);
+
       // Fetch member counts for each group
       const groupsWithMembers: GroupChatWithMembers[] = await Promise.all(
-        (groups || []).map(async (group) => {
+        groupsList.map(async (group) => {
           const { count } = await supabase
             .from('group_chat_members')
             .select('*', { count: 'exact', head: true })
@@ -58,18 +68,30 @@ export const useGroupChats = () => {
         })
       );
 
-      setGroupChats(groupsWithMembers);
+      if (reset) {
+        setGroupChats(groupsWithMembers);
+        setPage(1);
+      } else {
+        setGroupChats(prev => [...prev, ...groupsWithMembers]);
+        setPage(currentPage + 1);
+      }
     } catch (error) {
       console.error('Error fetching group chats:', error);
       toast.error('Failed to load group chats');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, page]);
 
   useEffect(() => {
-    fetchGroupChats();
-  }, [fetchGroupChats]);
+    fetchGroupChats(true);
+  }, [user]);
+
+  const loadMore = useCallback(async () => {
+    if (hasMore && !isLoading) {
+      await fetchGroupChats(false);
+    }
+  }, [hasMore, isLoading, fetchGroupChats]);
 
   const createGroupChat = async (name: string, description?: string) => {
     if (!user) {
@@ -103,7 +125,7 @@ export const useGroupChats = () => {
       if (memberError) throw memberError;
 
       toast.success('Group created successfully!');
-      await fetchGroupChats();
+      await fetchGroupChats(true);
       return group;
     } catch (error) {
       console.error('Error creating group:', error);
@@ -185,6 +207,10 @@ export const useGroupChats = () => {
   const leaveGroup = async (groupId: string) => {
     if (!user) return;
 
+    // Optimistic update
+    const originalGroup = groupChats.find(g => g.id === groupId);
+    setGroupChats(prev => prev.filter(g => g.id !== groupId));
+
     try {
       const { error } = await supabase
         .from('group_chat_members')
@@ -195,15 +221,22 @@ export const useGroupChats = () => {
       if (error) throw error;
 
       toast.success('Left the group');
-      await fetchGroupChats();
     } catch (error) {
+      // Rollback on failure
       console.error('Error leaving group:', error);
+      if (originalGroup) {
+        setGroupChats(prev => [originalGroup, ...prev]);
+      }
       toast.error('Failed to leave group');
     }
   };
 
   const deleteGroup = async (groupId: string) => {
     if (!user) return;
+
+    // Optimistic update
+    const originalGroup = groupChats.find(g => g.id === groupId);
+    setGroupChats(prev => prev.filter(g => g.id !== groupId));
 
     try {
       const { error } = await supabase
@@ -214,9 +247,12 @@ export const useGroupChats = () => {
       if (error) throw error;
 
       toast.success('Group deleted');
-      await fetchGroupChats();
     } catch (error) {
+      // Rollback on failure
       console.error('Error deleting group:', error);
+      if (originalGroup) {
+        setGroupChats(prev => [originalGroup, ...prev]);
+      }
       toast.error('Failed to delete group');
     }
   };
@@ -224,11 +260,13 @@ export const useGroupChats = () => {
   return {
     groupChats,
     isLoading,
+    hasMore,
     createGroupChat,
     inviteMember,
     leaveGroup,
     deleteGroup,
-    refreshGroupChats: fetchGroupChats,
+    loadMore,
+    refreshGroupChats: () => fetchGroupChats(true),
   };
 };
 
@@ -382,6 +420,10 @@ export const useGroupChat = (groupId: string | null) => {
   const removeMember = async (memberId: string) => {
     if (!isAdmin) return;
 
+    // Optimistic update
+    const originalMember = members.find(m => m.id === memberId);
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+
     try {
       const { error } = await supabase
         .from('group_chat_members')
@@ -390,10 +432,13 @@ export const useGroupChat = (groupId: string | null) => {
 
       if (error) throw error;
 
-      setMembers(prev => prev.filter(m => m.id !== memberId));
       toast.success('Member removed');
     } catch (error) {
+      // Rollback on failure
       console.error('Error removing member:', error);
+      if (originalMember) {
+        setMembers(prev => [...prev, originalMember]);
+      }
       toast.error('Failed to remove member');
     }
   };
