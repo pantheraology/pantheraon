@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Palette, Shield, Camera, Check, Loader2 } from 'lucide-react';
+import { User, Palette, Shield, Camera, Check, Loader2, Key } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { THEMES } from '@/config/themes';
+import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -123,7 +124,7 @@ const Settings = () => {
       </div>
 
       <Tabs defaultValue="profile" className="w-full max-w-2xl">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
+        <TabsList className="grid w-full grid-cols-4 mb-8">
           <TabsTrigger value="profile" className="flex items-center gap-2">
             <User size={16} />
             Profile
@@ -131,6 +132,10 @@ const Settings = () => {
           <TabsTrigger value="appearance" className="flex items-center gap-2">
             <Palette size={16} />
             Appearance
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" className="flex items-center gap-2">
+            <Key size={16} />
+            API Keys
           </TabsTrigger>
           <TabsTrigger value="account" className="flex items-center gap-2">
             <Shield size={16} />
@@ -242,6 +247,10 @@ const Settings = () => {
               ))}
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="api-keys" className="space-y-6">
+          <ApiKeysSection />
         </TabsContent>
 
         <TabsContent value="account" className="space-y-6">

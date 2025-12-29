@@ -146,7 +146,7 @@ export const Sidebar = ({
                     "relative transition-all duration-200",
                     isDragging && "opacity-50",
                     isDragOver && "transform translate-y-1",
-                    isEditMode && "cursor-grab active:cursor-grabbing"
+                    isEditMode && "cursor-grab active:cursor-grabbing animate-wobble"
                   )}
                   {...(!isEditMode ? longPressHandlers : {})}
                 >

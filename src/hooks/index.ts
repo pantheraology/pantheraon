@@ -16,6 +16,7 @@ export { usePageTracking, useTrackEvent, useTimedAction, useAnalytics } from './
 export { useTranslation, useT, useTranslationKey } from './useTranslation';
 export { useLongPress } from './useLongPress';
 export { useNavOrder } from './useNavOrder';
+export { useApiKeys } from './useApiKeys';
 
 // Re-export types for convenience
 export type { Conversation, Space, Message } from '@/types';

@@ -1,8 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
-import { Message } from '@/types';
+import { Message, ChatMode } from '@/types';
 import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
+
+interface ChatOptions {
+  mode?: ChatMode;
+  model?: string;
+}
 
 const TIMEOUT_MS = 60000; // 60 second timeout
 
@@ -20,7 +25,7 @@ export const useChat = () => {
     }
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, options?: ChatOptions) => {
     // Cancel any existing request
     cancelRequest();
 
@@ -69,6 +74,8 @@ export const useChat = () => {
             role: m.role,
             content: m.content,
           })),
+          mode: options?.mode || 'normal',
+          model: options?.model || 'google/gemini-2.5-flash',
         }),
         signal,
       });
