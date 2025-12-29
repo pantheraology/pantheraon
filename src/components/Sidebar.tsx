@@ -79,8 +79,8 @@ export const Sidebar = ({
     setDragOverIndex(null);
   }, []);
 
-  // Filter items based on auth status
-  const visibleItems = orderedItems.filter(item => !item.requiresAuth || user);
+  // Filter items based on auth status and hidden flag
+  const visibleItems = orderedItems.filter(item => (!item.requiresAuth || user) && !item.hidden);
 
   return (
     <>

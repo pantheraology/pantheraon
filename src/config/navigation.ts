@@ -6,6 +6,7 @@ export interface NavItem {
   path: string;
   requiresAuth?: boolean;
   isDynamic?: boolean; // For Agent section that changes name
+  hidden?: boolean; // Temporarily hide from navigation
 }
 
 export const navItems: NavItem[] = [
@@ -14,7 +15,7 @@ export const navItems: NavItem[] = [
   { icon: Users, label: 'Group Chat', path: '/groups', requiresAuth: true },
   { icon: Bot, label: 'AGENT', path: '/agent', requiresAuth: true, isDynamic: true },
   { icon: Sparkles, label: 'Assistants', path: '/assistants', requiresAuth: true },
-  { icon: Palette, label: 'Studio', path: '/studio', requiresAuth: true },
+  { icon: Palette, label: 'Studio', path: '/studio', requiresAuth: true, hidden: true },
   { icon: LayoutGrid, label: 'Spaces', path: '/spaces', requiresAuth: true },
   { icon: Library, label: 'Library', path: '/library', requiresAuth: true },
 ];
