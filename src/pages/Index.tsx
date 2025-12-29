@@ -6,6 +6,7 @@ import { SuggestionChips } from '@/components/SuggestionChips';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
+import { useAuth } from '@/contexts/AuthContext';
 const Index = () => {
   const {
     messages,
@@ -19,8 +20,12 @@ const Index = () => {
   const {
     isSignedIn
   } = useAuthGuard();
+  const { user, profile } = useAuth();
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>();
   const [greeting, setGreeting] = useState('Good Evening');
+
+  // Get user's display name
+  const displayName = profile?.full_name || profile?.username || user?.email?.split('@')[0] || '';
 
   // Set greeting based on time
   useEffect(() => {
@@ -60,7 +65,7 @@ const Index = () => {
       // Welcome State
       <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[740px] gap-8 py-20">
             <h1 className="text-4xl md:text-5xl font-light text-center text-foreground leading-tight drop-shadow-2xl animate-fade-in">
-              {greeting} <br />
+              {greeting}{displayName ? `, ${displayName}` : ''} <br />
               
             </h1>
 
