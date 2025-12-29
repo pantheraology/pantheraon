@@ -5,42 +5,34 @@ import { navItems } from '@/config/navigation';
 import { SIDEBAR_WIDTH } from '@/constants/layout';
 import { BRAND } from '@/config/brand';
 import { UserAccountMenu } from '@/components/UserAccountMenu';
-
 interface SidebarProps {
   isOpen?: boolean;
   isMobile?: boolean;
   onClose?: () => void;
 }
-
-export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarProps) => {
+export const Sidebar = ({
+  isOpen = true,
+  isMobile = false,
+  onClose
+}: SidebarProps) => {
   const location = useLocation();
-  const { user, isLoading } = useAuth();
-
+  const {
+    user,
+    isLoading
+  } = useAuth();
   const handleNavClick = () => {
     if (isMobile && onClose) {
       onClose();
     }
   };
-
-  return (
-    <>
+  return <>
       {/* Backdrop for mobile */}
-      {isMobile && isOpen && (
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 md:hidden"
-          onClick={onClose}
-        />
-      )}
+      {isMobile && isOpen && <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 md:hidden" onClick={onClose} />}
 
       {/* Sidebar */}
-      <div
-        className={cn(
-          "h-screen bg-sidebar flex flex-col justify-between py-6 px-4 fixed left-0 top-0 z-40 border-r border-border/50 transition-transform duration-300 ease-in-out",
-          isMobile && !isOpen && "-translate-x-full",
-          isMobile && isOpen && "translate-x-0"
-        )}
-        style={{ width: SIDEBAR_WIDTH }}
-      >
+      <div className={cn("h-screen bg-sidebar flex flex-col justify-between py-6 px-4 fixed left-0 top-0 z-40 border-r border-border/50 transition-transform duration-300 ease-in-out", isMobile && !isOpen && "-translate-x-full", isMobile && isOpen && "translate-x-0")} style={{
+      width: SIDEBAR_WIDTH
+    }}>
         {/* Top Section */}
         <div className="flex flex-col gap-6">
           {/* Brand */}
@@ -53,68 +45,36 @@ export const Sidebar = ({ isOpen = true, isMobile = false, onClose }: SidebarPro
 
           {/* Navigation */}
           <nav className="flex flex-col gap-2 mt-8">
-            {navItems
-              .filter((item) => !item.requiresAuth || user)
-              .map((item) => {
-                const isActive = location.pathname === item.path;
-                const Icon = item.icon;
-
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    onClick={handleNavClick}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-2.5 w-full rounded-lg transition-all duration-200",
-                      isActive
-                        ? "bg-[radial-gradient(85.38%_270.12%_at_0%_50%,hsl(var(--primary))_0%,hsl(var(--primary)/0.7)_35%,hsl(var(--primary)/0.4)_75%,hsl(var(--primary)/0.25)_100%)] text-foreground shadow-lg"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    )}
-                  >
+            {navItems.filter(item => !item.requiresAuth || user).map(item => {
+            const isActive = location.pathname === item.path;
+            const Icon = item.icon;
+            return <Link key={item.path} to={item.path} onClick={handleNavClick} className={cn("flex items-center gap-3 px-4 py-2.5 w-full rounded-lg transition-all duration-200", isActive ? "bg-[radial-gradient(85.38%_270.12%_at_0%_50%,hsl(var(--primary))_0%,hsl(var(--primary)/0.7)_35%,hsl(var(--primary)/0.4)_75%,hsl(var(--primary)/0.25)_100%)] text-foreground shadow-lg" : "text-muted-foreground hover:text-foreground hover:bg-muted/50")}>
                     <Icon size={18} />
                     <span className="font-medium text-[15px]">{item.label}</span>
-                  </Link>
-                );
-              })}
+                  </Link>;
+          })}
           </nav>
         </div>
 
         {/* Bottom Section */}
-        <div className="flex flex-col gap-4">
+        <div className="flex-col gap-4 flex items-center justify-start">
           {/* Info */}
-          <div className="px-2">
-            <p className="text-muted-foreground text-sm mb-4">{BRAND.TAGLINE}</p>
-          </div>
+          
 
           {/* Auth Buttons or User Menu */}
-          {isLoading ? (
-            <div className="animate-pulse space-y-3">
+          {isLoading ? <div className="animate-pulse space-y-3">
               <div className="h-10 bg-muted/50 rounded-lg" />
               <div className="h-10 bg-muted/50 rounded-lg" />
-            </div>
-          ) : user ? (
-            <UserAccountMenu />
-          ) : (
-            <>
-              <Link
-                to="/auth"
-                onClick={handleNavClick}
-                className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all text-center block"
-              >
+            </div> : user ? <UserAccountMenu /> : <>
+              <Link to="/auth" onClick={handleNavClick} className="w-full py-2.5 rounded-lg bg-gradient-to-b from-primary to-primary/60 text-primary-foreground font-medium text-[15px] shadow-lg hover:brightness-110 transition-all text-center block">
                 Sign up
               </Link>
 
-              <Link
-                to="/auth"
-                onClick={handleNavClick}
-                className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all text-center block"
-              >
+              <Link to="/auth" onClick={handleNavClick} className="w-full py-2.5 rounded-lg bg-muted/50 border border-border text-foreground font-medium text-[15px] hover:bg-muted transition-all text-center block">
                 Log in
               </Link>
-            </>
-          )}
+            </>}
         </div>
       </div>
-    </>
-  );
+    </>;
 };
