@@ -36,6 +36,7 @@ const Settings = () => {
   const { theme, setTheme } = useTheme();
   
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -43,6 +44,9 @@ const Settings = () => {
   useEffect(() => {
     if (profile?.full_name) {
       setFullName(profile.full_name);
+    }
+    if (profile?.username) {
+      setUsername(profile.username);
     }
   }, [profile]);
 
@@ -74,7 +78,10 @@ const Settings = () => {
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      const { error } = await updateProfile({ full_name: fullName });
+      const { error } = await updateProfile({ 
+        full_name: fullName,
+        username: username || undefined,
+      });
       if (error) {
         toast.error('Failed to update profile');
       } else {
@@ -163,6 +170,22 @@ const Settings = () => {
               placeholder="Enter your full name"
               className="max-w-md"
             />
+          </div>
+
+          {/* Username Field */}
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <div className="relative max-w-md">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">@</span>
+              <Input
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                placeholder="your_username"
+                className="pl-8"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Used for inviting you to group chats</p>
           </div>
 
           {/* Email Field (Read-only) */}
