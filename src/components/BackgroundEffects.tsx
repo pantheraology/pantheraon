@@ -50,14 +50,6 @@ export const BackgroundEffects = () => {
 
       {/* Shooting Star */}
       <div className="absolute top-1/4 left-1/4 w-[200px] h-[1px] bg-gradient-to-r from-transparent via-foreground to-transparent rotate-45 opacity-20 animate-shooting-star" />
-
-      {/* Star Labels (Decorations) */}
-      <div className="absolute top-[35%] left-[65%] opacity-30 transition-opacity duration-700">
-        <p className="text-foreground font-serif italic text-xl tracking-widest">Sun</p>
-      </div>
-      <div className="absolute bottom-[35%] right-[25%] opacity-30 transition-opacity duration-700">
-        <p className="text-foreground font-serif italic text-xl tracking-widest">Sirius</p>
-      </div>
     </div>
   );
 };
