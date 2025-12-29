@@ -14,3 +14,8 @@ export {
   type PaginationParams,
   type PaginatedResult,
 } from './base';
+
+// Domain services
+export * as conversationsService from './conversations';
+export * as agentsService from './agents';
+export * as promptsService from './prompts';
