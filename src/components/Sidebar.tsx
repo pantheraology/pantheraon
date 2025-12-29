@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -22,12 +22,18 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const location = useLocation();
   const { user, isLoading } = useAuth();
-  const { orderedItems, reorderItems } = useNavOrder();
+  const { orderedItems, reorderVisibleItems } = useNavOrder();
   
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPressing, setIsPressing] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dropPosition, setDropPosition] = useState<'above' | 'below'>('above');
+  
+  // Touch drag state
+  const [touchDragIndex, setTouchDragIndex] = useState<number | null>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   
   const { handlers: longPressHandlers } = useLongPress({
     onLongPress: () => {
@@ -40,6 +46,7 @@ export const Sidebar = ({
   });
 
   const handleNavClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isEditMode) {
       e.preventDefault();
       return;
@@ -49,38 +56,127 @@ export const Sidebar = ({
     }
   };
 
+  // Filter items based on auth status and hidden flag
+  const visibleItems = orderedItems.filter(item => (!item.requiresAuth || user) && !item.hidden);
+
   const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     if (!isEditMode) return;
+    e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+    
+    // Create custom drag image
+    const target = e.currentTarget as HTMLElement;
+    const clone = target.cloneNode(true) as HTMLElement;
+    clone.style.position = 'absolute';
+    clone.style.top = '-1000px';
+    clone.style.opacity = '0.9';
+    clone.style.transform = 'rotate(2deg)';
+    document.body.appendChild(clone);
+    e.dataTransfer.setDragImage(clone, 20, 20);
+    setTimeout(() => document.body.removeChild(clone), 0);
+    
     setDraggedIndex(index);
   }, [isEditMode]);
 
   const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.stopPropagation();
     e.dataTransfer.dropEffect = 'move';
+    
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    // Calculate if cursor is in top or bottom half of element
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const isAbove = y < rect.height / 2;
+    
     setDragOverIndex(index);
-  }, []);
+    setDropPosition(isAbove ? 'above' : 'below');
+  }, [draggedIndex]);
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverIndex(null);
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.stopPropagation();
+    // Only clear if leaving the nav area entirely
+    const relatedTarget = e.relatedTarget as Node;
+    if (!navRef.current?.contains(relatedTarget)) {
+      setDragOverIndex(null);
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, toIndex: number) => {
     e.preventDefault();
+    e.stopPropagation();
+    
     if (draggedIndex !== null && draggedIndex !== toIndex) {
-      reorderItems(draggedIndex, toIndex);
+      // Adjust target index based on drop position
+      let adjustedIndex = toIndex;
+      if (dropPosition === 'below' && draggedIndex < toIndex) {
+        adjustedIndex = toIndex;
+      } else if (dropPosition === 'above' && draggedIndex > toIndex) {
+        adjustedIndex = toIndex;
+      } else if (dropPosition === 'below') {
+        adjustedIndex = toIndex + 1;
+      }
+      
+      // Use the visible items aware reorder
+      reorderVisibleItems(visibleItems, draggedIndex, Math.min(adjustedIndex, visibleItems.length - 1));
     }
     setDraggedIndex(null);
     setDragOverIndex(null);
-  }, [draggedIndex, reorderItems]);
+  }, [draggedIndex, dropPosition, reorderVisibleItems, visibleItems]);
 
-  const handleDragEnd = useCallback(() => {
+  const handleDragEnd = useCallback((e: React.DragEvent) => {
+    e.stopPropagation();
     setDraggedIndex(null);
     setDragOverIndex(null);
   }, []);
 
-  // Filter items based on auth status and hidden flag
-  const visibleItems = orderedItems.filter(item => (!item.requiresAuth || user) && !item.hidden);
+  // Touch-based reordering
+  const handleTouchStart = useCallback((e: React.TouchEvent, index: number) => {
+    if (!isEditMode) return;
+    e.stopPropagation();
+    setTouchDragIndex(index);
+  }, [isEditMode]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchDragIndex === null || !isEditMode) return;
+    e.stopPropagation();
+    
+    const touch = e.touches[0];
+    
+    // Find which item we're over
+    for (let i = 0; i < itemRefs.current.length; i++) {
+      const item = itemRefs.current[i];
+      if (!item) continue;
+      
+      const rect = item.getBoundingClientRect();
+      if (touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        if (i !== touchDragIndex) {
+          const isAbove = touch.clientY < rect.top + rect.height / 2;
+          setDragOverIndex(i);
+          setDropPosition(isAbove ? 'above' : 'below');
+        }
+        break;
+      }
+    }
+  }, [touchDragIndex, isEditMode]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchDragIndex === null) return;
+    e.stopPropagation();
+    
+    if (dragOverIndex !== null && touchDragIndex !== dragOverIndex) {
+      let adjustedIndex = dragOverIndex;
+      if (dropPosition === 'below') {
+        adjustedIndex = Math.min(dragOverIndex + 1, visibleItems.length - 1);
+      }
+      reorderVisibleItems(visibleItems, touchDragIndex, adjustedIndex);
+    }
+    
+    setTouchDragIndex(null);
+    setDragOverIndex(null);
+  }, [touchDragIndex, dragOverIndex, dropPosition, reorderVisibleItems, visibleItems]);
 
   return (
     <>
@@ -126,33 +222,47 @@ export const Sidebar = ({
           )}
 
           {/* Navigation */}
-          <nav className="flex flex-col gap-2 mt-8">
+          <nav 
+            ref={navRef}
+            className="flex flex-col gap-1 mt-8"
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
             {visibleItems.map((item, index) => {
               const isActive = location.pathname === item.path;
               const Icon = item.icon;
-              const isDragging = draggedIndex === index;
-              const isDragOver = dragOverIndex === index;
+              const isDragging = draggedIndex === index || touchDragIndex === index;
+              const isDragOver = dragOverIndex === index && draggedIndex !== index && touchDragIndex !== index;
 
               return (
                 <div
                   key={item.path}
+                  ref={(el) => { itemRefs.current[index] = el; }}
                   draggable={isEditMode}
                   onDragStart={(e) => handleDragStart(e, index)}
                   onDragOver={(e) => handleDragOver(e, index)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, index)}
                   onDragEnd={handleDragEnd}
+                  onTouchStart={(e) => handleTouchStart(e, index)}
                   className={cn(
-                    "relative transition-all duration-200",
-                    isDragging && "opacity-50",
-                    isDragOver && "transform translate-y-1",
-                    isEditMode && "cursor-grab active:cursor-grabbing animate-wobble"
+                    "relative transition-all duration-200 ease-out",
+                    isDragging && "opacity-50 scale-[0.98] z-50",
+                    isDragOver && dropPosition === 'below' && "translate-y-1",
+                    isDragOver && dropPosition === 'above' && "-translate-y-1",
+                    isEditMode && "cursor-grab active:cursor-grabbing animate-wobble",
+                    isEditMode && "touch-none" // Prevent scroll interference
                   )}
                   {...(!isEditMode ? longPressHandlers : {})}
                 >
-                  {/* Drop indicator */}
-                  {isDragOver && draggedIndex !== index && (
-                    <div className="absolute -top-1 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                  {/* Drop indicator - above */}
+                  {isDragOver && dropPosition === 'above' && (
+                    <div className="absolute -top-1 left-2 right-2 h-0.5 bg-primary rounded-full shadow-[0_0_8px_hsl(var(--primary))]" />
+                  )}
+                  
+                  {/* Drop indicator - below */}
+                  {isDragOver && dropPosition === 'below' && (
+                    <div className="absolute -bottom-1 left-2 right-2 h-0.5 bg-primary rounded-full shadow-[0_0_8px_hsl(var(--primary))]" />
                   )}
                   
                   <Link
@@ -164,7 +274,8 @@ export const Sidebar = ({
                         ? "bg-[radial-gradient(85.38%_270.12%_at_0%_50%,hsl(var(--primary))_0%,hsl(var(--primary)/0.7)_35%,hsl(var(--primary)/0.4)_75%,hsl(var(--primary)/0.25)_100%)] text-foreground shadow-lg"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted/50",
                       isPressing && !isEditMode && "scale-[0.98] transition-transform",
-                      isEditMode && "pointer-events-none"
+                      isEditMode && "pointer-events-none",
+                      isDragging && "ring-2 ring-primary/50 bg-muted/50"
                     )}
                   >
                     {isEditMode && (
