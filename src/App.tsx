@@ -10,6 +10,7 @@ import { BackgroundEffects } from "@/components/BackgroundEffects";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useSidebar } from "@/hooks/useSidebar";
 import { SIDEBAR_WIDTH } from "@/constants/layout";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 // Lazy load route components for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -61,13 +62,15 @@ const AppContent = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

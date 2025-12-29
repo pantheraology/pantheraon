@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Settings, Archive, LogOut } from 'lucide-react';
+import { Settings, Archive, LogOut, Palette, Check } from 'lucide-react';
+import { useTheme, ThemeName } from '@/contexts/ThemeContext';
 import {
   Popover,
   PopoverContent,
@@ -8,8 +9,16 @@ import {
 } from '@/components/ui/popover';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+const themes: { id: ThemeName; name: string; color: string }[] = [
+  { id: 'space-blue', name: 'Space Blue', color: 'hsl(220 90% 50%)' },
+  { id: 'neon-orange', name: 'Neon Orange', color: 'hsl(14 100% 50%)' },
+  { id: 'cyber-yellow', name: 'Cyber Yellow', color: 'hsl(75 100% 50%)' },
+  { id: 'aqua-cyan', name: 'Aqua Cyan', color: 'hsl(187 94% 43%)' },
+];
+
 export const UserAccountMenu = () => {
   const { user, profile, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -49,6 +58,35 @@ export const UserAccountMenu = () => {
             <Settings size={16} className="text-muted-foreground" />
             Settings
           </button>
+          
+          <div className="h-px bg-border/50 my-1 mx-2" />
+          
+          {/* Themes Section */}
+          <div className="px-3 py-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Palette size={16} className="text-muted-foreground" />
+              <span className="text-sm text-foreground">Themes</span>
+            </div>
+            <div className="flex gap-2">
+              {themes.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className="relative w-7 h-7 rounded-full transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-popover"
+                  style={{ backgroundColor: t.color }}
+                  title={t.name}
+                >
+                  {theme === t.id && (
+                    <Check 
+                      size={14} 
+                      className="absolute inset-0 m-auto text-white drop-shadow-md" 
+                      strokeWidth={3}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
           
           <div className="h-px bg-border/50 my-1 mx-2" />
           
