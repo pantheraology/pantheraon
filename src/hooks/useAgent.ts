@@ -16,6 +16,7 @@ export const useAgent = (agentId: string | null) => {
   const { user } = useAuth();
   const [agent, setAgent] = useState<AgentWithDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [processingKnowledge, setProcessingKnowledge] = useState<Set<string>>(new Set());
 
   const fetchAgent = useCallback(async () => {
     if (!agentId || !user) {
@@ -154,7 +155,7 @@ export const useAgent = (agentId: string | null) => {
     }
   };
 
-  // Knowledge files
+  // Knowledge files with RAG processing
   const uploadKnowledge = async (file: File) => {
     if (!agentId || !user) return;
     
@@ -167,7 +168,8 @@ export const useAgent = (agentId: string | null) => {
       
       if (uploadError) throw uploadError;
       
-      const { error: dbError } = await supabase
+      // Insert knowledge record
+      const { data: knowledgeRecord, error: dbError } = await supabase
         .from('agent_knowledge')
         .insert({
           agent_id: agentId,
@@ -175,12 +177,45 @@ export const useAgent = (agentId: string | null) => {
           file_path: filePath,
           file_size: file.size,
           file_type: file.type,
-        });
+          processing_status: 'pending',
+        })
+        .select()
+        .single();
       
       if (dbError) throw dbError;
       
-      toast.success('File uploaded!');
+      toast.success('File uploaded! Processing for AI...');
       await fetchAgent();
+
+      // Trigger RAG processing in background
+      if (knowledgeRecord) {
+        setProcessingKnowledge(prev => new Set(prev).add(knowledgeRecord.id));
+        
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const response = await supabase.functions.invoke('process-knowledge', {
+              body: { knowledgeId: knowledgeRecord.id, agentId },
+            });
+
+            if (response.error) {
+              console.error('Processing error:', response.error);
+              toast.error('Failed to process file for AI. You can still use it.');
+            } else {
+              toast.success('File processed and ready for AI!');
+            }
+          }
+        } catch (procError) {
+          console.error('Processing invocation error:', procError);
+        } finally {
+          setProcessingKnowledge(prev => {
+            const next = new Set(prev);
+            next.delete(knowledgeRecord.id);
+            return next;
+          });
+          await fetchAgent();
+        }
+      }
     } catch (error) {
       handleError(error, 'Uploading knowledge file');
     }
@@ -197,7 +232,13 @@ export const useAgent = (agentId: string | null) => {
     }
 
     try {
+      // Delete embeddings first
+      await supabase.from('agent_embeddings').delete().eq('knowledge_id', knowledgeId);
+      
+      // Delete from storage
       await supabase.storage.from('agent-knowledge').remove([filePath]);
+      
+      // Delete record
       const { error } = await supabase.from('agent_knowledge').delete().eq('id', knowledgeId);
       
       if (error) throw error;
@@ -215,6 +256,7 @@ export const useAgent = (agentId: string | null) => {
   return {
     agent,
     isLoading,
+    processingKnowledge,
     addConversationStarter,
     removeConversationStarter,
     setModels,

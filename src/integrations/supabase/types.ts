@@ -104,6 +104,51 @@ export type Database = {
           },
         ]
       }
+      agent_embeddings: {
+        Row: {
+          agent_id: string
+          chunk_index: number
+          chunk_text: string
+          created_at: string
+          embedding: string | null
+          id: string
+          knowledge_id: string
+        }
+        Insert: {
+          agent_id: string
+          chunk_index: number
+          chunk_text: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          knowledge_id: string
+        }
+        Update: {
+          agent_id?: string
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          knowledge_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_embeddings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_embeddings_knowledge_id_fkey"
+            columns: ["knowledge_id"]
+            isOneToOne: false
+            referencedRelation: "agent_knowledge"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_knowledge: {
         Row: {
           agent_id: string
@@ -113,6 +158,8 @@ export type Database = {
           file_size: number | null
           file_type: string | null
           id: string
+          processing_error: string | null
+          processing_status: string | null
         }
         Insert: {
           agent_id: string
@@ -122,6 +169,8 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          processing_error?: string | null
+          processing_status?: string | null
         }
         Update: {
           agent_id?: string
@@ -131,6 +180,8 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          processing_error?: string | null
+          processing_status?: string | null
         }
         Relationships: [
           {

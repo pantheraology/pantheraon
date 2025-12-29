@@ -4,11 +4,20 @@ import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { CHAT_TIMEOUT_MS, RATE_LIMIT_DEFAULT_SECONDS } from '@/constants/timing';
+import { ChatAttachment } from '@/components/ChatInput';
 
 export interface ChatOptions {
   mode?: ChatMode;
   model?: string;
   agentId?: string;
+  attachments?: ChatAttachment[];
+}
+
+interface UploadedFile {
+  url: string;
+  type: 'image' | 'document';
+  name: string;
+  mimeType: string;
 }
 
 export const useChat = () => {
@@ -33,6 +42,41 @@ export const useChat = () => {
     setMessages(initialMessages);
   }, []);
 
+  // Upload attachments to Supabase storage
+  const uploadAttachments = async (attachments: ChatAttachment[], userId: string): Promise<UploadedFile[]> => {
+    const uploadedFiles: UploadedFile[] = [];
+
+    for (const attachment of attachments) {
+      const filePath = `${userId}/${Date.now()}_${attachment.file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-attachments')
+        .upload(filePath, attachment.file);
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        toast.error(`Failed to upload ${attachment.file.name}`);
+        continue;
+      }
+
+      // Get signed URL for the file (valid for 1 hour)
+      const { data: signedData } = await supabase.storage
+        .from('chat-attachments')
+        .createSignedUrl(filePath, 3600);
+
+      if (signedData?.signedUrl) {
+        uploadedFiles.push({
+          url: signedData.signedUrl,
+          type: attachment.type,
+          name: attachment.file.name,
+          mimeType: attachment.file.type,
+        });
+      }
+    }
+
+    return uploadedFiles;
+  };
+
   const sendMessage = useCallback(async (content: string, options?: ChatOptions) => {
     // Check if rate limited
     if (rateLimitRetryAt && rateLimitRetryAt > new Date()) {
@@ -43,10 +87,43 @@ export const useChat = () => {
     // Cancel any existing request
     cancelRequest();
 
+    // Get session first
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Please sign in to use chat');
+      return;
+    }
+
+    // Upload attachments if any
+    let uploadedFiles: UploadedFile[] = [];
+    if (options?.attachments && options.attachments.length > 0) {
+      toast.loading('Uploading files...');
+      uploadedFiles = await uploadAttachments(options.attachments, session.user.id);
+      toast.dismiss();
+      
+      if (uploadedFiles.length === 0 && options.attachments.length > 0) {
+        toast.error('Failed to upload files');
+        return;
+      }
+    }
+
+    // Build message content with file references
+    let messageContent = content;
+    if (uploadedFiles.length > 0) {
+      const fileDescriptions = uploadedFiles.map(f => 
+        f.type === 'image' ? `[Image: ${f.name}]` : `[Document: ${f.name}]`
+      ).join(' ');
+      if (content) {
+        messageContent = `${content}\n\n${fileDescriptions}`;
+      } else {
+        messageContent = fileDescriptions;
+      }
+    }
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content,
+      content: messageContent,
       timestamp: new Date(),
     };
 
@@ -68,15 +145,6 @@ export const useChat = () => {
     let assistantContent = '';
 
     try {
-      // Get the user's session token for authenticated requests
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error('Please sign in to use chat');
-        setIsLoading(false);
-        clearTimeout(timeoutId);
-        return;
-      }
-
       const resp = await fetch(getChatUrl(), {
         method: 'POST',
         headers: {
@@ -91,6 +159,7 @@ export const useChat = () => {
           mode: options?.mode || 'normal',
           model: options?.model || 'google/gemini-2.5-flash',
           agentId: options?.agentId,
+          attachments: uploadedFiles.length > 0 ? uploadedFiles : undefined,
         }),
         signal,
       });

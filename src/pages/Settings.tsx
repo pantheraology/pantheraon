@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Palette, Shield, Camera, Check, Loader2, Key } from 'lucide-react';
+import { User, Palette, Shield, Camera, Check, Loader2, Key, Upload } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { THEMES } from '@/config/themes';
 import { ApiKeysSection } from '@/components/settings/ApiKeysSection';
+import { AvatarCropper } from '@/components/settings/AvatarCropper';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +29,7 @@ import {
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { user, profile, isLoading: authLoading, updateProfile, deleteAccount } = useAuth();
+  const { user, profile, isLoading: authLoading, updateProfile, deleteAccount, refreshProfile } = useAuth();
   const { theme, setTheme } = useTheme();
   
   const [fullName, setFullName] = useState('');
@@ -35,6 +37,12 @@ const Settings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Avatar upload state
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Sync form with profile when it loads
   useEffect(() => {
@@ -110,6 +118,84 @@ const Settings = () => {
     }
   };
 
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be less than 5MB');
+      return;
+    }
+
+    setAvatarFile(file);
+    setIsCropperOpen(true);
+    
+    // Reset input
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+    if (!user) return;
+
+    setIsCropperOpen(false);
+    setIsUploadingAvatar(true);
+
+    try {
+      // Create unique file path
+      const filePath = `${user.id}/${Date.now()}.webp`;
+
+      // Delete old avatar if exists
+      if (profile?.avatar_url) {
+        const oldPath = profile.avatar_url.split('/avatars/')[1];
+        if (oldPath) {
+          await supabase.storage.from('avatars').remove([oldPath]);
+        }
+      }
+
+      // Upload new avatar
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, croppedBlob, {
+          contentType: 'image/webp',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profile with new avatar URL
+      const { error: profileError } = await updateProfile({
+        avatar_url: publicUrl,
+      });
+
+      if (profileError) throw profileError;
+
+      // Refresh profile to get latest data
+      await refreshProfile?.();
+
+      toast.success('Avatar updated!');
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      toast.error('Failed to upload avatar');
+    } finally {
+      setIsUploadingAvatar(false);
+      setAvatarFile(null);
+    }
+  };
+
   const initials = profile?.full_name
     ?.split(' ')
     .map((n) => n[0])
@@ -153,17 +239,37 @@ const Settings = () => {
                   {initials}
                 </AvatarFallback>
               </Avatar>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarSelect}
+                className="hidden"
+              />
               <button 
-                className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full text-primary-foreground hover:bg-primary/90 transition-colors"
-                onClick={() => toast.info('Avatar upload coming soon')}
+                className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploadingAvatar}
                 aria-label="Upload avatar"
               >
-                <Camera size={14} />
+                {isUploadingAvatar ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Camera size={14} />
+                )}
               </button>
             </div>
             <div>
               <h3 className="font-medium text-foreground">{profile?.full_name || 'Your Name'}</h3>
               <p className="text-sm text-muted-foreground">{profile?.email || user?.email}</p>
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
+                disabled={isUploadingAvatar}
+              >
+                <Upload size={12} />
+                Change photo
+              </button>
             </div>
           </div>
 
@@ -316,6 +422,17 @@ const Settings = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Avatar Cropper Modal */}
+      <AvatarCropper
+        open={isCropperOpen}
+        onClose={() => {
+          setIsCropperOpen(false);
+          setAvatarFile(null);
+        }}
+        imageFile={avatarFile}
+        onCropComplete={handleCropComplete}
+      />
     </PageContainer>
   );
 };

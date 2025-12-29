@@ -9,7 +9,20 @@ const corsHeaders = {
 // Message validation
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | MessageContent[];
+}
+
+interface MessageContent {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: { url: string };
+}
+
+interface UploadedFile {
+  url: string;
+  type: 'image' | 'document';
+  name: string;
+  mimeType: string;
 }
 
 type ChatMode = 'normal' | 'research' | 'thinking';
@@ -19,6 +32,7 @@ interface RequestBody {
   mode?: ChatMode;
   model?: string;
   agentId?: string;
+  attachments?: UploadedFile[];
 }
 
 function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; error?: string } {
@@ -102,11 +116,12 @@ function validateMessages(data: unknown): { valid: boolean; body?: RequestBody; 
       mode,
       model,
       agentId: requestBody.agentId as string | undefined,
+      attachments: requestBody.attachments as UploadedFile[] | undefined,
     } 
   };
 }
 
-function getSystemPrompt(mode: ChatMode, agentInstructions?: string): string {
+function getSystemPrompt(mode: ChatMode, agentInstructions?: string, knowledgeContext?: string): string {
   const baseName = Deno.env.get("AI_NAME") || "Ombrion";
   
   let basePrompt = `You are ${baseName}, an intelligent and helpful assistant. You provide clear, accurate, and thoughtful responses to user questions.
@@ -121,6 +136,11 @@ Key traits:
   // Prepend agent instructions if available
   if (agentInstructions) {
     basePrompt = `${agentInstructions}\n\n${basePrompt}`;
+  }
+
+  // Add knowledge context if available (RAG)
+  if (knowledgeContext) {
+    basePrompt = `${basePrompt}\n\n## Relevant Knowledge Base Context:\n${knowledgeContext}\n\nUse the above knowledge context to inform your responses when relevant.`;
   }
 
   if (mode === 'research') {
@@ -202,6 +222,122 @@ function getAnthropicModelName(model: string): string {
   }
 }
 
+// Generate embedding for RAG query
+async function generateQueryEmbedding(text: string, apiKey: string): Promise<number[] | null> {
+  try {
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-3-small',
+        input: text,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Embedding API error:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    return null;
+  }
+}
+
+// Retrieve relevant knowledge chunks using vector similarity
+async function retrieveKnowledgeContext(
+  agentId: string,
+  query: string,
+  supabaseClient: any,
+  lovableApiKey: string
+): Promise<string | null> {
+  try {
+    // Generate embedding for the query
+    const queryEmbedding = await generateQueryEmbedding(query, lovableApiKey);
+    if (!queryEmbedding) return null;
+
+    // Query for similar chunks using RPC (assuming a match function exists)
+    // For now, we'll do a simple fetch and filter (less optimal but works without custom RPC)
+    const { data: chunks, error } = await supabaseClient
+      .from('agent_embeddings')
+      .select('chunk_text, embedding')
+      .eq('agent_id', agentId)
+      .limit(20);
+
+    if (error || !chunks || chunks.length === 0) {
+      console.log('No knowledge chunks found for agent:', agentId);
+      return null;
+    }
+
+    // Calculate cosine similarity manually
+    const scoredChunks = chunks.map((chunk: any) => {
+      const embedding = chunk.embedding;
+      if (!embedding || !Array.isArray(embedding)) return { ...chunk, score: 0 };
+      
+      // Cosine similarity
+      let dotProduct = 0;
+      let normA = 0;
+      let normB = 0;
+      
+      for (let i = 0; i < queryEmbedding.length; i++) {
+        dotProduct += queryEmbedding[i] * (embedding[i] || 0);
+        normA += queryEmbedding[i] * queryEmbedding[i];
+        normB += (embedding[i] || 0) * (embedding[i] || 0);
+      }
+      
+      const score = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+      return { ...chunk, score };
+    });
+
+    // Sort by score and take top 5
+    scoredChunks.sort((a: any, b: any) => b.score - a.score);
+    const topChunks = scoredChunks.slice(0, 5).filter((c: any) => c.score > 0.3);
+
+    if (topChunks.length === 0) return null;
+
+    // Combine chunks into context
+    const context = topChunks.map((c: any) => c.chunk_text).join('\n\n---\n\n');
+    console.log(`Retrieved ${topChunks.length} knowledge chunks for agent ${agentId}`);
+    
+    return context;
+  } catch (error) {
+    console.error('Error retrieving knowledge context:', error);
+    return null;
+  }
+}
+
+// Build multimodal message content for vision models
+function buildMultimodalContent(textContent: string, attachments?: UploadedFile[]): string | MessageContent[] {
+  if (!attachments || attachments.length === 0) {
+    return textContent;
+  }
+
+  const imageAttachments = attachments.filter(a => a.type === 'image');
+  if (imageAttachments.length === 0) {
+    return textContent;
+  }
+
+  // Build multimodal content array
+  const content: MessageContent[] = [
+    { type: 'text', text: textContent }
+  ];
+
+  for (const img of imageAttachments) {
+    content.push({
+      type: 'image_url',
+      image_url: { url: img.url }
+    });
+  }
+
+  return content;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -214,6 +350,12 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+
+    // Also create admin client for RAG queries
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Verify user authentication
@@ -250,11 +392,15 @@ serve(async (req) => {
       });
     }
 
-    const { messages, mode, model: requestedModel, agentId } = validation.body!;
+    const { messages, mode, model: requestedModel, agentId, attachments } = validation.body!;
     const finalModel = getModelForMode(requestedModel!, mode!);
 
     // Fetch agent instructions if agentId is provided
     let agentInstructions: string | undefined;
+    let knowledgeContext: string | undefined;
+    
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    
     if (agentId) {
       const { data: agent, error: agentError } = await supabaseClient
         .from('agents')
@@ -267,9 +413,23 @@ serve(async (req) => {
         agentInstructions = agent.instructions;
         console.log("Using agent instructions for agent:", agentId);
       }
+
+      // Retrieve RAG context from agent knowledge
+      if (lovableApiKey && messages.length > 0) {
+        const lastUserMessage = messages.filter(m => m.role === 'user').pop();
+        if (lastUserMessage && typeof lastUserMessage.content === 'string') {
+          const ragContext = await retrieveKnowledgeContext(
+            agentId,
+            lastUserMessage.content,
+            supabaseAdmin,
+            lovableApiKey
+          );
+          if (ragContext) knowledgeContext = ragContext;
+        }
+      }
     }
 
-    const systemPrompt = getSystemPrompt(mode!, agentInstructions);
+    const systemPrompt = getSystemPrompt(mode!, agentInstructions, knowledgeContext);
     
     // Check for user's own API key (BYOK)
     const { data: userApiKeys } = await supabaseClient
@@ -286,7 +446,19 @@ serve(async (req) => {
 
     const userKey = userApiKeys?.find(k => k.provider === provider);
 
-    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${!!userKey}, messages=${messages.length}, agentId=${agentId || 'none'}`);
+    console.log(`Chat request: user=${user.id}, mode=${mode}, model=${finalModel}, byok=${!!userKey}, messages=${messages.length}, agentId=${agentId || 'none'}, attachments=${attachments?.length || 0}, hasRAG=${!!knowledgeContext}`);
+
+    // Prepare messages with multimodal content if attachments present
+    const lastMessageIndex = messages.length - 1;
+    const processedMessages = messages.map((m, i) => {
+      if (i === lastMessageIndex && m.role === 'user' && attachments && attachments.length > 0) {
+        return {
+          role: m.role,
+          content: buildMultimodalContent(m.content as string, attachments),
+        };
+      }
+      return m;
+    });
 
     // If user has their own API key for this provider, use it directly
     if (userKey) {
@@ -305,7 +477,7 @@ serve(async (req) => {
             model: openaiModel,
             messages: [
               { role: 'system', content: systemPrompt },
-              ...messages,
+              ...processedMessages,
             ],
             stream: true,
             max_completion_tokens: 4096,
@@ -341,6 +513,34 @@ serve(async (req) => {
       } else if (provider === 'google') {
         // Direct Google AI API call
         const googleModel = getGoogleModelName(finalModel);
+        
+        // Build Google AI format messages
+        const googleMessages = processedMessages.map(m => {
+          if (Array.isArray(m.content)) {
+            // Multimodal message
+            return {
+              role: m.role === 'assistant' ? 'model' : 'user',
+              parts: (m.content as MessageContent[]).map(part => {
+                if (part.type === 'text') {
+                  return { text: part.text };
+                } else if (part.type === 'image_url') {
+                  return { 
+                    inlineData: { 
+                      mimeType: 'image/jpeg',
+                      data: part.image_url?.url || ''
+                    }
+                  };
+                }
+                return { text: '' };
+              })
+            };
+          }
+          return {
+            role: m.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: m.content as string }]
+          };
+        });
+
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:streamGenerateContent?key=${userKey.api_key}&alt=sse`, {
           method: 'POST',
           headers: {
@@ -349,10 +549,7 @@ serve(async (req) => {
           body: JSON.stringify({
             contents: [
               { role: 'user', parts: [{ text: systemPrompt }] },
-              ...messages.map(m => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: m.content }]
-              }))
+              ...googleMessages
             ],
             generationConfig: {
               maxOutputTokens: 4096,
@@ -417,6 +614,35 @@ serve(async (req) => {
       } else if (provider === 'anthropic') {
         // Direct Anthropic API call
         const anthropicModel = getAnthropicModelName(finalModel);
+        
+        // Convert to Anthropic format (handle multimodal)
+        const anthropicMessages = processedMessages.map(m => {
+          if (Array.isArray(m.content)) {
+            // Multimodal message - convert to Anthropic format
+            return {
+              role: m.role,
+              content: (m.content as MessageContent[]).map(part => {
+                if (part.type === 'text') {
+                  return { type: 'text', text: part.text };
+                } else if (part.type === 'image_url') {
+                  return {
+                    type: 'image',
+                    source: {
+                      type: 'url',
+                      url: part.image_url?.url || ''
+                    }
+                  };
+                }
+                return { type: 'text', text: '' };
+              })
+            };
+          }
+          return {
+            role: m.role,
+            content: m.content as string,
+          };
+        });
+
         const response = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
@@ -428,10 +654,7 @@ serve(async (req) => {
             model: anthropicModel,
             max_tokens: 4096,
             system: systemPrompt,
-            messages: messages.map(m => ({
-              role: m.role,
-              content: m.content,
-            })),
+            messages: anthropicMessages,
             stream: true,
           }),
         });
@@ -494,7 +717,6 @@ serve(async (req) => {
     }
 
     // Fallback to Lovable AI gateway
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableApiKey) {
       console.error("No API key available");
       return new Response(JSON.stringify({ error: "Server configuration error" }), {
@@ -513,7 +735,7 @@ serve(async (req) => {
         model: finalModel,
         messages: [
           { role: "system", content: systemPrompt },
-          ...messages,
+          ...processedMessages,
         ],
         stream: true,
       }),
