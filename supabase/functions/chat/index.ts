@@ -25,6 +25,70 @@ interface UploadedFile {
   mimeType: string;
 }
 
+// Validate attachment URL to prevent SSRF attacks
+function validateAttachmentUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTPS
+    if (parsed.protocol !== 'https:') return false;
+    
+    // Block internal/private IPs and metadata endpoints
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname.match(/^127\./) ||
+      hostname.match(/^10\./) ||
+      hostname.match(/^172\.(1[6-9]|2[0-9]|3[01])\./) ||
+      hostname.match(/^192\.168\./) ||
+      hostname === '169.254.169.254' ||
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.local')
+    ) {
+      return false;
+    }
+    
+    // Only allow Supabase storage URLs
+    return hostname.endsWith('.supabase.co');
+  } catch {
+    return false;
+  }
+}
+
+// Validate and sanitize attachment metadata
+function validateAttachment(attachment: unknown): UploadedFile | null {
+  if (!attachment || typeof attachment !== 'object') return null;
+  
+  const a = attachment as Record<string, unknown>;
+  
+  // Validate URL
+  if (typeof a.url !== 'string' || !validateAttachmentUrl(a.url)) {
+    return null;
+  }
+  
+  // Validate type
+  if (!['image', 'document'].includes(a.type as string)) {
+    return null;
+  }
+  
+  // Sanitize name - remove special characters and limit length
+  const safeName = typeof a.name === 'string' 
+    ? a.name.replace(/[^a-zA-Z0-9._\- ]/g, '').slice(0, 255)
+    : 'unknown';
+  
+  // Sanitize mimeType - take only the base type and limit length
+  const safeMimeType = typeof a.mimeType === 'string'
+    ? a.mimeType.split(';')[0].trim().slice(0, 100)
+    : 'application/octet-stream';
+  
+  return {
+    url: a.url as string,
+    type: a.type as 'image' | 'document',
+    name: safeName,
+    mimeType: safeMimeType
+  };
+}
+
 type ChatMode = 'normal' | 'research' | 'thinking';
 
 interface RequestBody {
@@ -392,7 +456,23 @@ serve(async (req) => {
       });
     }
 
-    const { messages, mode, model: requestedModel, agentId, attachments } = validation.body!;
+    const { messages, mode, model: requestedModel, agentId, attachments: rawAttachments } = validation.body!;
+    
+    // Validate and sanitize attachments to prevent SSRF
+    const validatedAttachments = (rawAttachments || [])
+      .map(validateAttachment)
+      .filter((a): a is UploadedFile => a !== null);
+    
+    // If some attachments were invalid, reject the request
+    if (rawAttachments && rawAttachments.length > 0 && validatedAttachments.length !== rawAttachments.length) {
+      console.warn(`Rejected invalid attachments: ${rawAttachments.length - validatedAttachments.length} of ${rawAttachments.length}`);
+      return new Response(
+        JSON.stringify({ error: 'Invalid attachment URLs. Only HTTPS URLs from Supabase storage are allowed.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const attachments = validatedAttachments;
     const finalModel = getModelForMode(requestedModel!, mode!);
 
     // Fetch agent instructions if agentId is provided
