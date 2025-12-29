@@ -2,22 +2,23 @@ import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { User, Sparkles } from 'lucide-react';
 import { Message } from '@/types';
-import DOMPurify from 'dompurify';
 
 interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
 }
 
-// Configure DOMPurify to be extra restrictive - only allow safe text
-const sanitizeContent = (content: string): string => {
-  // First, escape any HTML entities to render as plain text
-  // This prevents any HTML injection while preserving the visual content
-  return DOMPurify.sanitize(content, {
-    ALLOWED_TAGS: [], // No HTML tags allowed
-    ALLOWED_ATTR: [], // No attributes allowed
-    KEEP_CONTENT: true, // Keep the text content
-  });
+// Simple HTML entity escaping for XSS prevention
+// Since we're displaying plain text, we just need to escape HTML entities
+const escapeHtml = (text: string): string => {
+  const htmlEntities: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
 };
 
 export const MessageList = ({ messages, isLoading }: MessageListProps) => {
@@ -62,7 +63,7 @@ export const MessageList = ({ messages, isLoading }: MessageListProps) => {
               : "glass text-foreground"
           )}>
             <p className="whitespace-pre-wrap leading-relaxed">
-              {sanitizeContent(message.content)}
+              {escapeHtml(message.content)}
             </p>
           </div>
         </div>
