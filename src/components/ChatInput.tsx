@@ -1,7 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Brain, Search, ChevronDown, Check, X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ChatMode, CHAT_MODELS } from '@/types';
+import { ChatMode, ChatAttachment, CHAT_MODELS } from '@/types';
+import {
+  ACCEPTED_IMAGE_TYPES,
+  ACCEPTED_DOC_TYPES,
+  MAX_FILE_SIZE_BYTES,
+  MAX_FILE_SIZE_MB,
+  isAcceptedImageType,
+  isAcceptedDocType,
+  ACCEPTED_FILE_TYPES,
+} from '@/constants/files';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -17,21 +26,14 @@ import {
 } from '@/components/ui/tooltip';
 import { PromptbasePopover } from '@/components/chat/PromptbasePopover';
 
-export interface ChatAttachment {
-  file: File;
-  preview?: string;
-  type: 'image' | 'document';
-}
+// Re-export ChatAttachment for backward compatibility
+export type { ChatAttachment } from '@/types';
 
 interface ChatInputProps {
   onSend: (message: string, options?: { mode: ChatMode; model: string; attachments?: ChatAttachment[] }) => void;
   isLoading?: boolean;
   placeholder?: string;
 }
-
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const ACCEPTED_DOC_TYPES = ['application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anything..." }: ChatInputProps) => {
   const [input, setInput] = useState('');
@@ -64,13 +66,13 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
     const files = Array.from(e.target.files || []);
     
     files.forEach(file => {
-      if (file.size > MAX_FILE_SIZE) {
-        toast.error(`File ${file.name} is too large (max 10MB)`);
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error(`File ${file.name} is too large (max ${MAX_FILE_SIZE_MB}MB)`);
         return;
       }
 
-      const isImage = ACCEPTED_IMAGE_TYPES.includes(file.type);
-      const isDoc = ACCEPTED_DOC_TYPES.includes(file.type);
+      const isImage = isAcceptedImageType(file.type);
+      const isDoc = isAcceptedDocType(file.type);
 
       if (!isImage && !isDoc) {
         toast.error(`File type not supported: ${file.type}`);
@@ -162,7 +164,7 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
           ref={fileInputRef}
           type="file"
           multiple
-          accept={[...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_DOC_TYPES].join(',')}
+          accept={ACCEPTED_FILE_TYPES.join(',')}
           onChange={handleFileChange}
           className="hidden"
         />

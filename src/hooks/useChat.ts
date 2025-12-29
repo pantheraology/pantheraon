@@ -1,24 +1,13 @@
 import { useState, useCallback, useRef } from 'react';
-import { Message, ChatMode } from '@/types';
+import { Message, ChatMode, ChatAttachment, UploadedFile, ChatOptions } from '@/types';
+import { STORAGE_BUCKETS, SIGNED_URL_EXPIRY_SECONDS } from '@/constants/files';
 import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 import { CHAT_TIMEOUT_MS, RATE_LIMIT_DEFAULT_SECONDS } from '@/constants/timing';
-import { ChatAttachment } from '@/components/ChatInput';
 
-export interface ChatOptions {
-  mode?: ChatMode;
-  model?: string;
-  agentId?: string;
-  attachments?: ChatAttachment[];
-}
-
-interface UploadedFile {
-  url: string;
-  type: 'image' | 'document';
-  name: string;
-  mimeType: string;
-}
+// Re-export types for backward compatibility
+export type { ChatOptions } from '@/types';
 
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -42,7 +31,7 @@ export const useChat = () => {
     setMessages(initialMessages);
   }, []);
 
-  // Upload attachments to Supabase storage
+  // Upload attachments to storage
   const uploadAttachments = async (attachments: ChatAttachment[], userId: string): Promise<UploadedFile[]> => {
     const uploadedFiles: UploadedFile[] = [];
 
@@ -50,7 +39,7 @@ export const useChat = () => {
       const filePath = `${userId}/${Date.now()}_${attachment.file.name}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('chat-attachments')
+        .from(STORAGE_BUCKETS.CHAT_ATTACHMENTS)
         .upload(filePath, attachment.file);
 
       if (uploadError) {
@@ -59,10 +48,10 @@ export const useChat = () => {
         continue;
       }
 
-      // Get signed URL for the file (valid for 1 hour)
+      // Get signed URL for the file
       const { data: signedData } = await supabase.storage
-        .from('chat-attachments')
-        .createSignedUrl(filePath, 3600);
+        .from(STORAGE_BUCKETS.CHAT_ATTACHMENTS)
+        .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS);
 
       if (signedData?.signedUrl) {
         uploadedFiles.push({
