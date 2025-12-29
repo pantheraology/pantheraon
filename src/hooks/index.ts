@@ -19,6 +19,6 @@ export { useNavOrder } from './useNavOrder';
 export { useApiKeys } from './useApiKeys';
 
 // Re-export types for convenience
-export type { Conversation, Space, Message } from '@/types';
+export type { Conversation, Space, Message, ChatMode, ChatAttachment, ChatOptions, UploadedFile } from '@/types';
 export type { Agent, AgentWithDetails } from '@/types/agent';
 export type { StudioGeneration } from './useStudioGenerations';

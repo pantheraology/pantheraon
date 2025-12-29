@@ -22,14 +22,13 @@ export interface Space {
   createdAt: Date;
 }
 
-// Chat modes
-export type ChatMode = 'normal' | 'research' | 'thinking';
-
-export interface ChatOptions {
-  mode: ChatMode;
-  model: string;
-  attachments?: File[];
-}
+// Re-export chat types from centralized location
+export { 
+  type ChatMode,
+  type ChatAttachment,
+  type ChatOptions,
+  type UploadedFile,
+} from './chat';
 
 // Re-export models from centralized location
 export { 
