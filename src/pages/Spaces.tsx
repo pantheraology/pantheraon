@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Plus, FolderOpen } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
+import { useSpaces } from '@/hooks/useSpaces';
 import { SpaceCard } from '@/components/cards/SpaceCard';
 import { AuthModal } from '@/components/AuthModal';
 import { AuthPrompt } from '@/components/common/AuthPrompt';
@@ -9,14 +10,15 @@ import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { PageContainer } from '@/components/layout/PageContainer';
 
 const Spaces = () => {
-  const { spaces, createSpace, deleteSpace, getConversationsBySpace } = useConversations();
+  const { getConversationsBySpace } = useConversations();
+  const { spaces, createSpace, deleteSpace } = useSpaces();
   const { isSignedIn, showAuthModal, requireAuth, closeAuthModal } = useAuthGuard();
   const [newSpaceName, setNewSpaceName] = useState('');
   const [showNewSpace, setShowNewSpace] = useState(false);
 
-  const handleCreateSpace = () => {
+  const handleCreateSpace = async () => {
     if (newSpaceName.trim()) {
-      createSpace(newSpaceName.trim());
+      await createSpace(newSpaceName.trim());
       setNewSpaceName('');
       setShowNewSpace(false);
     }
