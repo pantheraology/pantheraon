@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useStudioGenerations } from '@/hooks/useStudioGenerations';
 import { GenerationCard } from './GenerationCard';
 import { ImagePreviewModal } from './ImagePreviewModal';
-import { Wand2, Loader2, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Wand2, Loader2, Image as ImageIcon, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const ASPECT_RATIOS = [
@@ -15,6 +15,8 @@ const ASPECT_RATIOS = [
   { value: '16:9', label: 'Landscape', icon: '🖼️' },
   { value: '9:16', label: 'Portrait', icon: '📱' },
 ];
+
+const TIMEOUT_MS = 120000; // 2 minute timeout for image generation
 
 export const ImageStudio = () => {
   const { user } = useAuth();
@@ -25,6 +27,21 @@ export const ImageStudio = () => {
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; prompt: string } | null>(null);
+  const [rateLimitRetryAt, setRateLimitRetryAt] = useState<Date | null>(null);
+  
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      toast({
+        title: 'Cancelled',
+        description: 'Image generation was cancelled',
+      });
+    }
+  };
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -45,7 +62,27 @@ export const ImageStudio = () => {
       return;
     }
 
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
     setIsGenerating(true);
+
+    // Setup timeout
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        toast({
+          title: 'Request timed out',
+          description: 'Image generation took too long. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    }, TIMEOUT_MS);
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
@@ -59,6 +96,7 @@ export const ImageStudio = () => {
             'Authorization': `Bearer ${sessionData.session?.access_token}`,
           },
           body: JSON.stringify({ prompt: prompt.trim(), aspectRatio }),
+          signal,
         }
       );
 
@@ -66,7 +104,12 @@ export const ImageStudio = () => {
         const errorData = await response.json();
         
         if (response.status === 429) {
-          throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+          const retryAfter = response.headers.get('Retry-After');
+          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : 60;
+          const retryAt = new Date(Date.now() + retrySeconds * 1000);
+          setRateLimitRetryAt(retryAt);
+          
+          throw new Error(`Rate limit exceeded. Please wait ${retrySeconds} seconds and try again at ${retryAt.toLocaleTimeString()}.`);
         }
         if (response.status === 402) {
           throw new Error('Usage limit reached. Please add credits to continue.');
@@ -89,6 +132,7 @@ export const ImageStudio = () => {
       }
       
       setPrompt('');
+      setRateLimitRetryAt(null);
       
       // Add to local state optimistically
       if (!data.isBase64) {
@@ -104,19 +148,35 @@ export const ImageStudio = () => {
       }
 
     } catch (error) {
-      console.error('Generation error:', error);
-      toast({
-        title: 'Generation failed',
-        description: error instanceof Error ? error.message : 'Something went wrong',
-        variant: 'destructive',
-      });
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was cancelled - don't show error (already handled)
+        console.log('Image generation cancelled');
+      } else {
+        console.error('Generation error:', error);
+        toast({
+          title: 'Generation failed',
+          description: error instanceof Error ? error.message : 'Something went wrong',
+          variant: 'destructive',
+        });
+      }
     } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
       setIsGenerating(false);
     }
   };
 
   return (
     <div className="space-y-8">
+      {/* Rate Limit Countdown */}
+      {rateLimitRetryAt && rateLimitRetryAt > new Date() && (
+        <div className="glass-card rounded-xl p-4 border-warning/50 bg-warning/10">
+          <p className="text-sm text-warning-foreground">
+            Rate limited. You can try again at {rateLimitRetryAt.toLocaleTimeString()}.
+          </p>
+        </div>
+      )}
+
       {/* Generation Form */}
       <div className="glass-card rounded-2xl p-6 space-y-6">
         <div className="flex items-center gap-3">
@@ -164,23 +224,36 @@ export const ImageStudio = () => {
           </div>
         </div>
 
-        <Button
-          onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim()}
-          className="w-full h-12 text-base font-medium"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Wand2 className="mr-2 h-5 w-5" />
-              Generate Image
-            </>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleGenerate}
+            disabled={isGenerating || !prompt.trim()}
+            className="flex-1 h-12 text-base font-medium"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Wand2 className="mr-2 h-5 w-5" />
+                Generate Image
+              </>
+            )}
+          </Button>
+          
+          {isGenerating && (
+            <Button
+              onClick={cancelGeneration}
+              variant="outline"
+              className="h-12 px-4"
+              aria-label="Cancel generation"
+            >
+              <X className="h-5 w-5" />
+            </Button>
           )}
-        </Button>
+        </div>
       </div>
 
       {/* Gallery */}
