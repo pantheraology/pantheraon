@@ -6,22 +6,80 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Security: File validation constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_EXTENSIONS = ['txt', 'md', 'pdf', 'json'];
+const ALLOWED_MIME_TYPES = [
+  'text/plain',
+  'text/markdown',
+  'application/pdf',
+  'application/json',
+];
+
 const CHUNK_SIZE = 500; // tokens approx (chars / 4)
 const CHUNK_OVERLAP = 50;
+
+// Magic byte signatures for file type validation
+const FILE_SIGNATURES: Record<string, number[]> = {
+  pdf: [0x25, 0x50, 0x44, 0x46], // %PDF
+  // JSON and text files don't have reliable magic bytes - validate content instead
+};
+
+function validateFileExtension(fileName: string): { valid: boolean; extension: string } {
+  const extension = fileName.split('.').pop()?.toLowerCase() || '';
+  return {
+    valid: ALLOWED_EXTENSIONS.includes(extension),
+    extension,
+  };
+}
+
+function validateMagicBytes(data: Uint8Array, expectedType: string): boolean {
+  const signature = FILE_SIGNATURES[expectedType];
+  if (!signature) {
+    // No signature to check (text/json files)
+    return true;
+  }
+  
+  if (data.length < signature.length) {
+    return false;
+  }
+  
+  return signature.every((byte, index) => data[index] === byte);
+}
+
+function validateJsonContent(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateTextContent(text: string): boolean {
+  // Check for excessive binary content (non-printable characters)
+  const nonPrintableCount = (text.match(/[^\x20-\x7E\n\r\t]/g) || []).length;
+  const ratio = nonPrintableCount / text.length;
+  return ratio < 0.1; // Allow up to 10% non-printable chars
+}
 
 function chunkText(text: string): string[] {
   const chunks: string[] = [];
   const charChunkSize = CHUNK_SIZE * 4;
   const charOverlap = CHUNK_OVERLAP * 4;
   
+  // Limit total text size to prevent memory exhaustion
+  const maxTextLength = 1000000; // 1MB of text
+  const processedText = text.slice(0, maxTextLength);
+  
   let start = 0;
-  while (start < text.length) {
-    let end = Math.min(start + charChunkSize, text.length);
+  while (start < processedText.length) {
+    let end = Math.min(start + charChunkSize, processedText.length);
     
     // Try to break at sentence boundary
-    if (end < text.length) {
-      const lastPeriod = text.lastIndexOf('.', end);
-      const lastNewline = text.lastIndexOf('\n', end);
+    if (end < processedText.length) {
+      const lastPeriod = processedText.lastIndexOf('.', end);
+      const lastNewline = processedText.lastIndexOf('\n', end);
       const breakPoint = Math.max(lastPeriod, lastNewline);
       
       if (breakPoint > start + charChunkSize / 2) {
@@ -29,7 +87,7 @@ function chunkText(text: string): string[] {
       }
     }
     
-    const chunk = text.slice(start, end).trim();
+    const chunk = processedText.slice(start, end).trim();
     if (chunk.length > 0) {
       chunks.push(chunk);
     }
@@ -63,7 +121,12 @@ async function generateEmbedding(text: string, apiKey: string): Promise<number[]
   return data.data[0].embedding;
 }
 
-async function extractTextFromFile(bucket: string, path: string, supabase: any): Promise<string> {
+async function extractTextFromFile(
+  bucket: string, 
+  path: string, 
+  supabase: any,
+  expectedExtension: string
+): Promise<string> {
   // Download file from storage
   const { data, error } = await supabase.storage.from(bucket).download(path);
   
@@ -71,28 +134,58 @@ async function extractTextFromFile(bucket: string, path: string, supabase: any):
     throw new Error(`Failed to download file: ${error.message}`);
   }
 
-  const fileType = path.split('.').pop()?.toLowerCase();
+  // Get file size and validate
+  const arrayBuffer = await data.arrayBuffer();
+  const fileSize = arrayBuffer.byteLength;
   
-  if (fileType === 'txt' || fileType === 'md') {
-    return await data.text();
+  if (fileSize > MAX_FILE_SIZE) {
+    throw new Error(`File size ${fileSize} bytes exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`);
+  }
+
+  const uint8Array = new Uint8Array(arrayBuffer);
+  
+  // Validate magic bytes for PDF
+  if (expectedExtension === 'pdf') {
+    if (!validateMagicBytes(uint8Array, 'pdf')) {
+      throw new Error('File content does not match PDF format');
+    }
+  }
+
+  const textDecoder = new TextDecoder();
+  
+  if (expectedExtension === 'txt' || expectedExtension === 'md') {
+    const text = textDecoder.decode(uint8Array);
+    if (!validateTextContent(text)) {
+      throw new Error('File contains excessive binary content - appears to be corrupted or wrong file type');
+    }
+    return text;
   }
   
-  if (fileType === 'pdf') {
+  if (expectedExtension === 'pdf') {
     // For PDF, we'll extract basic text (in production, use a PDF parser)
     // This is a simplified approach - real implementation would use pdf.js or similar
-    const text = await data.text();
+    const text = textDecoder.decode(uint8Array);
     // Filter out binary content and extract readable text
     const cleanText = text.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s+/g, ' ');
     return cleanText;
   }
   
-  if (fileType === 'json') {
-    const json = await data.json();
-    return JSON.stringify(json, null, 2);
+  if (expectedExtension === 'json') {
+    const text = textDecoder.decode(uint8Array);
+    if (!validateJsonContent(text)) {
+      throw new Error('Invalid JSON content');
+    }
+    // Limit JSON size to prevent memory issues during stringify
+    const json = JSON.parse(text);
+    return JSON.stringify(json, null, 2).slice(0, 500000); // 500KB limit for JSON output
   }
 
-  // Default: try to read as text
-  return await data.text();
+  // Default: try to read as text with validation
+  const text = textDecoder.decode(uint8Array);
+  if (!validateTextContent(text)) {
+    throw new Error('File contains excessive binary content');
+  }
+  return text;
 }
 
 serve(async (req) => {
@@ -162,9 +255,15 @@ serve(async (req) => {
       throw new Error(`Knowledge not found: ${knowledgeError?.message}`);
     }
 
-    // Extract text from file
-    console.log(`Extracting text from ${knowledge.file_path}`);
-    const text = await extractTextFromFile('agent-knowledge', knowledge.file_path, supabase);
+    // Validate file extension before processing
+    const { valid: validExtension, extension } = validateFileExtension(knowledge.file_name);
+    if (!validExtension) {
+      throw new Error(`Unsupported file type: .${extension}. Allowed types: ${ALLOWED_EXTENSIONS.join(', ')}`);
+    }
+
+    // Extract text from file with validation
+    console.log(`Extracting text from ${knowledge.file_path} (type: ${extension})`);
+    const text = await extractTextFromFile('agent-knowledge', knowledge.file_path, supabase, extension);
     
     if (!text || text.trim().length === 0) {
       throw new Error('No text content extracted from file');
