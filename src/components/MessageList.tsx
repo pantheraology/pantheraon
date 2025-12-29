@@ -2,24 +2,12 @@ import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { User, Sparkles } from 'lucide-react';
 import { Message } from '@/types';
+import { MarkdownRenderer } from '@/components/chat/MarkdownRenderer';
 
 interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
 }
-
-// Simple HTML entity escaping for XSS prevention
-// Since we're displaying plain text, we just need to escape HTML entities
-const escapeHtml = (text: string): string => {
-  const htmlEntities: Record<string, string> = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;',
-  };
-  return text.replace(/[&<>"']/g, (char) => htmlEntities[char] || char);
-};
 
 export const MessageList = ({ messages, isLoading }: MessageListProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -62,9 +50,11 @@ export const MessageList = ({ messages, isLoading }: MessageListProps) => {
               ? "bg-primary/10 text-foreground ml-auto" 
               : "glass text-foreground"
           )}>
-            <p className="whitespace-pre-wrap leading-relaxed">
-              {escapeHtml(message.content)}
-            </p>
+            {message.role === 'user' ? (
+              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            ) : (
+              <MarkdownRenderer content={message.content} />
+            )}
           </div>
         </div>
       ))}

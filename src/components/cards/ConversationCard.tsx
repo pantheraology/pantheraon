@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { MessageSquare, Trash2, Clock } from 'lucide-react';
 import { Conversation } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,7 +13,10 @@ export const ConversationCard = ({ conversation, onDelete }: ConversationCardPro
   const preview = lastMessage?.content.slice(0, 100) || '';
 
   return (
-    <div className="glass rounded-xl p-4 hover:border-primary/30 transition-all group">
+    <Link 
+      to={`/chat/${conversation.id}`}
+      className="block glass rounded-xl p-4 hover:border-primary/30 transition-all group"
+    >
       <div className="flex items-start gap-4">
         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
           <MessageSquare size={18} className="text-primary" />
@@ -49,6 +53,6 @@ export const ConversationCard = ({ conversation, onDelete }: ConversationCardPro
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };

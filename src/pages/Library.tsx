@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, MessageSquare } from 'lucide-react';
+import { Search, MessageSquare, ChevronDown } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
 import { ConversationCard } from '@/components/cards/ConversationCard';
@@ -7,16 +7,30 @@ import { AuthPrompt } from '@/components/common/AuthPrompt';
 import { EmptyState } from '@/components/common/EmptyState';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { ConversationSkeleton } from '@/components/common/LoadingSkeleton';
+import { Button } from '@/components/ui/button';
 
 const Library = () => {
-  const { conversations, isLoading: conversationsLoading, deleteConversation } = useConversations();
+  const { 
+    conversations, 
+    isLoading: conversationsLoading, 
+    deleteConversation,
+    hasMore,
+    loadMore,
+  } = useConversations();
   const { isSignedIn, isLoaded } = useAuthGuard();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const filteredConversations = conversations.filter(c =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.messages.some(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  const handleLoadMore = async () => {
+    setIsLoadingMore(true);
+    await loadMore();
+    setIsLoadingMore(false);
+  };
 
   if (isLoaded && !isSignedIn) {
     return (
@@ -71,13 +85,39 @@ const Library = () => {
             actionPath={searchQuery ? undefined : '/'}
           />
         ) : (
-          filteredConversations.map((conversation) => (
-            <ConversationCard 
-              key={conversation.id}
-              conversation={conversation}
-              onDelete={() => deleteConversation(conversation.id)}
-            />
-          ))
+          <>
+            {filteredConversations.map((conversation) => (
+              <ConversationCard 
+                key={conversation.id}
+                conversation={conversation}
+                onDelete={() => deleteConversation(conversation.id)}
+              />
+            ))}
+            
+            {/* Load More Button */}
+            {hasMore && !searchQuery && (
+              <div className="flex justify-center pt-4">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="gap-2"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={16} />
+                      Load More
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </PageContainer>
