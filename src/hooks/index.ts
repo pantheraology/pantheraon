@@ -11,6 +11,9 @@ export { useGroupChats, useGroupChat } from './useGroupChats';
 export { useStudioGenerations } from './useStudioGenerations';
 export { useDebounce } from './useDebounce';
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
+export { useFeatureFlag, useFeatureFlagWithSetter, useAllFeatureFlags } from './useFeatureFlag';
+export { usePageTracking, useTrackEvent, useTimedAction, useAnalytics } from './useAnalytics';
+export { useTranslation, useT, useTranslationKey } from './useTranslation';
 
 // Re-export types for convenience
 export type { Conversation, Space, Message } from '@/types';
