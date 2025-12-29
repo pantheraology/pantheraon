@@ -458,6 +458,7 @@ export type Database = {
     }
     Functions: {
       owns_agent: { Args: { agent_uuid: string }; Returns: boolean }
+      shares_group_with: { Args: { target_user_id: string }; Returns: boolean }
     }
     Enums: {
       group_member_role: "admin" | "member"
