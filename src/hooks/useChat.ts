@@ -1,14 +1,29 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Message } from '@/types';
 import { toast } from 'sonner';
 import { getChatUrl } from '@/lib/api';
 import { supabase } from '@/integrations/supabase/client';
 
+const TIMEOUT_MS = 60000; // 60 second timeout
+
 export const useChat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [rateLimitRetryAt, setRateLimitRetryAt] = useState<Date | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const cancelRequest = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+      setIsLoading(false);
+    }
+  }, []);
 
   const sendMessage = useCallback(async (content: string) => {
+    // Cancel any existing request
+    cancelRequest();
+
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -19,6 +34,18 @@ export const useChat = () => {
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
+    const { signal } = abortControllerRef.current;
+
+    // Setup timeout
+    const timeoutId = setTimeout(() => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        toast.error('Request timed out. Please try again.');
+      }
+    }, TIMEOUT_MS);
+
     let assistantContent = '';
 
     try {
@@ -27,6 +54,7 @@ export const useChat = () => {
       if (!session) {
         toast.error('Please sign in to use chat');
         setIsLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
@@ -42,13 +70,23 @@ export const useChat = () => {
             content: m.content,
           })),
         }),
+        signal,
       });
 
       if (!resp.ok) {
         const errorData = await resp.json().catch(() => ({}));
         
         if (resp.status === 429) {
-          toast.error('Rate limit exceeded. Please wait a moment and try again.');
+          // Extract retry-after header or default to 60 seconds
+          const retryAfter = resp.headers.get('Retry-After');
+          const retrySeconds = retryAfter ? parseInt(retryAfter, 10) : 60;
+          const retryAt = new Date(Date.now() + retrySeconds * 1000);
+          setRateLimitRetryAt(retryAt);
+          
+          toast.error(`Rate limit exceeded. Please wait ${retrySeconds} seconds.`, {
+            duration: 5000,
+            description: `You can try again at ${retryAt.toLocaleTimeString()}`,
+          });
         } else if (resp.status === 402) {
           toast.error('Usage limit reached. Please add credits to continue.');
         } else {
@@ -56,6 +94,7 @@ export const useChat = () => {
         }
         
         setIsLoading(false);
+        clearTimeout(timeoutId);
         return;
       }
 
@@ -80,6 +119,12 @@ export const useChat = () => {
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
+        
+        // Check if aborted
+        if (signal.aborted) {
+          reader.cancel();
+          break;
+        }
         
         textBuffer += decoder.decode(value, { stream: true });
 
@@ -120,7 +165,7 @@ export const useChat = () => {
       }
 
       // Final flush
-      if (textBuffer.trim()) {
+      if (textBuffer.trim() && !signal.aborted) {
         for (let raw of textBuffer.split('\n')) {
           if (!raw) continue;
           if (raw.endsWith('\r')) raw = raw.slice(0, -1);
@@ -147,21 +192,31 @@ export const useChat = () => {
         );
       }
     } catch (error) {
-      console.error('Chat error:', error);
-      toast.error('Failed to send message. Please try again.');
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was cancelled - don't show error
+        console.log('Request cancelled');
+      } else {
+        console.error('Chat error:', error);
+        toast.error('Failed to send message. Please try again.');
+      }
     } finally {
+      clearTimeout(timeoutId);
+      abortControllerRef.current = null;
       setIsLoading(false);
     }
-  }, [messages]);
+  }, [messages, cancelRequest]);
 
   const clearMessages = useCallback(() => {
+    cancelRequest();
     setMessages([]);
-  }, []);
+  }, [cancelRequest]);
 
   return {
     messages,
     isLoading,
     sendMessage,
     clearMessages,
+    cancelRequest,
+    rateLimitRetryAt,
   };
 };

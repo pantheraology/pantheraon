@@ -26,13 +26,14 @@ import {
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { user, profile, isLoading: authLoading, updateProfile, signOut } = useAuth();
+  const { user, profile, isLoading: authLoading, updateProfile, deleteAccount } = useAuth();
   const { theme, setTheme } = useTheme();
   
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   // Sync form with profile when it loads
   useEffect(() => {
@@ -91,12 +92,18 @@ const Settings = () => {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      // For now, just sign out - actual account deletion requires admin API
-      await signOut();
-      toast.success('You have been signed out');
-      navigate('/');
+      const { error } = await deleteAccount();
+      
+      if (error) {
+        toast.error(error.message || 'Failed to delete account');
+        setDeleteDialogOpen(false);
+      } else {
+        toast.success('Your account has been permanently deleted');
+        navigate('/');
+      }
     } catch {
       toast.error('Failed to delete account');
+      setDeleteDialogOpen(false);
     } finally {
       setIsDeleting(false);
     }
@@ -144,6 +151,7 @@ const Settings = () => {
               <button 
                 className="absolute bottom-0 right-0 p-1.5 bg-primary rounded-full text-primary-foreground hover:bg-primary/90 transition-colors"
                 onClick={() => toast.info('Avatar upload coming soon')}
+                aria-label="Upload avatar"
               >
                 <Camera size={14} />
               </button>
@@ -218,6 +226,8 @@ const Settings = () => {
                   key={t.id}
                   onClick={() => setTheme(t.id)}
                   className="flex flex-col items-center gap-2 p-4 rounded-xl border border-border hover:border-primary/50 transition-colors group"
+                  aria-label={`Select ${t.name} theme`}
+                  aria-pressed={theme === t.id}
                 >
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center transition-transform group-hover:scale-110"
@@ -254,9 +264,9 @@ const Settings = () => {
           <div className="pt-6 border-t border-border">
             <h3 className="text-lg font-medium text-destructive mb-2">Danger Zone</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Permanently delete your account and all associated data
+              Permanently delete your account and all associated data. This action cannot be undone.
             </p>
-            <AlertDialog>
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive">Delete Account</Button>
               </AlertDialogTrigger>
@@ -265,16 +275,31 @@ const Settings = () => {
                   <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete your account
-                    and remove all your data from our servers.
+                    and remove all your data including:
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      <li>All your conversations and messages</li>
+                      <li>All your agents and their configurations</li>
+                      <li>All your group chat memberships</li>
+                      <li>All your generated images and studio content</li>
+                      <li>Your profile and preferences</li>
+                    </ul>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteAccount}
+                    disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    {isDeleting ? 'Deleting...' : 'Delete Account'}
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete Account'
+                    )}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

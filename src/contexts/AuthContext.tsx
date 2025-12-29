@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface Profile {
   id: string;
@@ -22,6 +23,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url' | 'username'>>) => Promise<{ error: Error | null }>;
   refreshProfile: () => Promise<void>;
+  deleteAccount: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,16 +56,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Handle session updates
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Defer profile fetch with setTimeout to avoid deadlock
-        if (session?.user) {
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
+        // Handle specific auth events
+        switch (event) {
+          case 'SIGNED_IN':
+          case 'TOKEN_REFRESHED':
+            // Defer profile fetch with setTimeout to avoid deadlock
+            if (session?.user) {
+              setTimeout(() => {
+                fetchProfile(session.user.id);
+              }, 0);
+            }
+            break;
+          case 'SIGNED_OUT':
+            setProfile(null);
+            break;
+          case 'USER_UPDATED':
+            // Refresh profile when user data changes
+            if (session?.user) {
+              setTimeout(() => {
+                fetchProfile(session.user.id);
+              }, 0);
+            }
+            break;
         }
         
         setIsLoading(false);
@@ -141,6 +159,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error };
   };
 
+  const deleteAccount = async () => {
+    if (!session) {
+      return { error: new Error('Not authenticated') };
+    }
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to delete account');
+      }
+
+      // Sign out locally after successful deletion
+      await supabase.auth.signOut();
+      setProfile(null);
+      
+      return { error: null };
+    } catch (error) {
+      console.error('Delete account error:', error);
+      return { error: error instanceof Error ? error : new Error('Failed to delete account') };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -154,6 +205,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         updateProfile,
         refreshProfile,
+        deleteAccount,
       }}
     >
       {children}
