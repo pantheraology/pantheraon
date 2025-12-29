@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Brain, Search, ChevronDown, Check, X, Image, FileText } from 'lucide-react';
+import { Send, Paperclip, Brain, Search, ChevronDown, Check, X, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChatMode, CHAT_MODELS } from '@/types';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { PromptbasePopover } from '@/components/chat/PromptbasePopover';
 
 export interface ChatAttachment {
   file: File;
@@ -107,6 +108,11 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
     setMode(prev => prev === newMode ? 'normal' : newMode);
   };
 
+  const handleSelectPrompt = (content: string) => {
+    setInput(prev => prev ? `${prev}\n\n${content}` : content);
+    inputRef.current?.focus();
+  };
+
   // Auto-resize textarea
   useEffect(() => {
     if (inputRef.current) {
@@ -175,7 +181,7 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
           />
           
           <div className="flex items-center justify-between mt-2 border-t border-border pt-3 gap-2">
-            {/* Left side: Attachment and Modes */}
+            {/* Left side: Attachment, Modes, and Promptbase */}
             <div className="flex items-center gap-1">
               {/* Attachment */}
               <Tooltip>
@@ -241,6 +247,12 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
                 </Tooltip>
               )}
 
+              {/* Promptbase */}
+              <PromptbasePopover onSelectPrompt={handleSelectPrompt} />
+            </div>
+
+            {/* Right side: Model Selector and Send */}
+            <div className="flex items-center gap-2">
               {/* Model Selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -249,7 +261,7 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
                     <ChevronDown size={14} />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="end" className="w-56">
                   {CHAT_MODELS.map((model) => (
                     <DropdownMenuItem
                       key={model.id}
@@ -265,19 +277,19 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
 
-            {/* Right side: Send */}
-            <button 
-              onClick={handleSubmit}
-              disabled={(!input.trim() && attachments.length === 0) || isLoading}
-              className={cn(
-                "w-10 h-10 rounded-full bg-gradient-to-b from-primary to-primary/60 flex items-center justify-center text-primary-foreground shadow-lg transition-all",
-                (input.trim() || attachments.length > 0) && !isLoading ? "hover:brightness-110" : "opacity-50 cursor-not-allowed"
-              )}
-            >
-              <Send size={18} />
-            </button>
+              {/* Send Button - Rectangular to match theme */}
+              <button 
+                onClick={handleSubmit}
+                disabled={(!input.trim() && attachments.length === 0) || isLoading}
+                className={cn(
+                  "h-10 px-4 rounded-lg bg-gradient-to-b from-primary to-primary/60 flex items-center justify-center text-primary-foreground shadow-lg transition-all",
+                  (input.trim() || attachments.length > 0) && !isLoading ? "hover:brightness-110" : "opacity-50 cursor-not-allowed"
+                )}
+              >
+                <Send size={18} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
