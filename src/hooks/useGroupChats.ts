@@ -115,15 +115,37 @@ export const useGroupChats = () => {
   const inviteMember = async (groupId: string, identifier: string) => {
     if (!user) return { error: 'Not authenticated' };
 
+    // Validate and sanitize input
+    const sanitizedIdentifier = identifier.trim();
+    if (!sanitizedIdentifier || sanitizedIdentifier.length > 255) {
+      return { error: 'Invalid username or email' };
+    }
+
     try {
-      // Try to find user by username or email
-      const { data: targetUser, error: findError } = await supabase
+      // Try to find user by username first (using safe parameterized query)
+      let targetUser: { id: string; username: string | null; email: string | null } | null = null;
+      
+      const { data: userByUsername, error: usernameError } = await supabase
         .from('profiles')
         .select('id, username, email')
-        .or(`username.eq.${identifier},email.eq.${identifier}`)
+        .eq('username', sanitizedIdentifier)
         .maybeSingle();
 
-      if (findError) throw findError;
+      if (usernameError) throw usernameError;
+      
+      if (userByUsername) {
+        targetUser = userByUsername;
+      } else {
+        // If not found by username, try email (using safe parameterized query)
+        const { data: userByEmail, error: emailError } = await supabase
+          .from('profiles')
+          .select('id, username, email')
+          .eq('email', sanitizedIdentifier)
+          .maybeSingle();
+
+        if (emailError) throw emailError;
+        targetUser = userByEmail;
+      }
 
       if (!targetUser) {
         return { error: 'User not found. Check the username or email.' };
