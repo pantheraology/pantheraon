@@ -3,7 +3,6 @@ import { HeaderWidget } from '@/components/HeaderWidget';
 import { ChatInput } from '@/components/ChatInput';
 import { MessageList } from '@/components/MessageList';
 import { SuggestionChips } from '@/components/SuggestionChips';
-import { GuestWelcome } from '@/components/GuestWelcome';
 import { useChat } from '@/hooks/useChat';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthGuard } from '@/hooks/useAuthGuard';
@@ -48,11 +47,6 @@ const Index = () => {
   const handleSuggestionSelect = useCallback((prompt: string) => {
     sendMessage(prompt);
   }, [sendMessage]);
-
-  // Show guest welcome for non-authenticated users
-  if (!isSignedIn) {
-    return <GuestWelcome />;
-  }
 
   const hasMessages = messages.length > 0;
 
