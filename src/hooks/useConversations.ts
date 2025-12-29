@@ -2,16 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Message } from '@/types';
-
-export interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  createdAt: Date;
-  updatedAt: Date;
-  spaceId: string | null;
-}
+import { Message, Conversation } from '@/types';
 
 interface DbConversation {
   id: string;

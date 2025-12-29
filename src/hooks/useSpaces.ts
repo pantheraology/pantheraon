@@ -2,13 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-
-export interface Space {
-  id: string;
-  name: string;
-  icon: string | null;
-  createdAt: Date;
-}
+import { Space } from '@/types';
 
 interface DbSpace {
   id: string;

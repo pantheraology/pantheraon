@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { X, LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-
+import { BRAND } from '@/config/brand';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,7 +20,7 @@ export const AuthModal = ({ isOpen, onClose, message }: AuthModalProps) => {
       <DialogContent className="sm:max-w-md glass-strong border-border">
         <DialogHeader>
           <DialogTitle className="text-2xl text-foreground">
-            Welcome to PantheraON
+            Welcome to {BRAND.APP_NAME}
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
             {message || 'Sign in to unlock all features and save your conversations.'}

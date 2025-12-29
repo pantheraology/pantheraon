@@ -39,7 +39,7 @@ export const UserAccountMenu = () => {
       <PopoverContent 
         side="top" 
         align="start" 
-        className="w-52 p-2 bg-[hsl(240_10%_10%)] border-border/50 rounded-xl shadow-xl"
+        className="w-52 p-2 bg-popover border-border/50 rounded-xl shadow-xl"
       >
         <div className="flex flex-col">
           <button
