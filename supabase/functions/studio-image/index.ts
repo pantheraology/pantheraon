@@ -153,19 +153,23 @@ serve(async (req) => {
       );
     }
 
-    // Get public URL
-    const { data: publicUrlData } = supabaseClient.storage
+    // Create signed URL for immediate use (1 hour expiry)
+    const { data: signedUrlData, error: signError } = await supabaseClient.storage
       .from('studio-assets')
-      .getPublicUrl(fileName);
+      .createSignedUrl(fileName, 3600);
 
-    // Save to database
+    if (signError) {
+      console.error('Signed URL error:', signError);
+    }
+
+    // Save file path to database (not the full URL - we'll generate signed URLs on demand)
     const { error: dbError } = await supabaseClient
       .from('studio_generations')
       .insert({
         user_id: user.id,
         type: 'image',
         prompt: prompt,
-        result_url: publicUrlData.publicUrl,
+        result_url: fileName, // Store the file path, not the URL
         settings: { aspectRatio, isEdit: !!editImageUrl }
       });
 
@@ -177,8 +181,9 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        imageUrl: publicUrlData.publicUrl,
-        isBase64: false
+        imageUrl: signedUrlData?.signedUrl || imageData,
+        filePath: fileName,
+        isBase64: !signedUrlData?.signedUrl
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
