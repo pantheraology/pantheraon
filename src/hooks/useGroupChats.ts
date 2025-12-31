@@ -1,260 +1,171 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+/**
+ * Group Chats Hook - React Query Implementation
+ * Modern state management with caching and optimistic updates
+ */
+
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { GroupChat, GroupChatWithMembers } from '@/types/groupChat';
-import { handleError } from '@/lib/errors';
 import { toast } from 'sonner';
+import { GroupChatWithMembers } from '@/types/groupChat';
+import * as groupChatsService from '@/services/groupChats';
+import { handleError } from '@/lib/errors';
 
 const PAGE_SIZE = 50;
+const QUERY_KEY = 'groupChats';
 
 export const useGroupChats = () => {
   const { user } = useAuth();
-  const [groupChats, setGroupChats] = useState<GroupChatWithMembers[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasMore, setHasMore] = useState(true);
-  const [page, setPage] = useState(0);
+  const queryClient = useQueryClient();
 
-  const fetchGroupChats = useCallback(async (reset: boolean = true) => {
-    if (!user) {
-      setGroupChats([]);
-      setIsLoading(false);
-      return;
-    }
+  // Fetch group chats with infinite query for pagination
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [QUERY_KEY, user?.id],
+    queryFn: async ({ pageParam = 0 }) => {
+      if (!user) return { data: [], hasMore: false };
+      return groupChatsService.fetchGroupChats(user.id, { page: pageParam, pageSize: PAGE_SIZE });
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.hasMore ? allPages.length : undefined;
+    },
+    initialPageParam: 0,
+    enabled: !!user,
+  });
 
-    try {
-      const currentPage = reset ? 0 : page;
-      
-      // Get all groups user is a member of
-      const { data: memberships, error: memberError } = await supabase
-        .from('group_chat_members')
-        .select('group_id')
-        .eq('user_id', user.id);
+  // Flatten pages into group chats
+  const groupChats = (data?.pages.flatMap((page) => page.data) || []) as GroupChatWithMembers[];
 
-      if (memberError) throw memberError;
+  // Create group chat mutation
+  const createGroupChatMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description?: string }) => {
+      if (!user) throw new Error('Not authenticated');
+      return groupChatsService.createGroupChat(user.id, name, description);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success('Group created successfully!');
+    },
+    onError: (error) => {
+      handleError(error, 'Creating group');
+    },
+  });
 
-      if (!memberships || memberships.length === 0) {
-        setGroupChats([]);
-        setIsLoading(false);
-        return;
+  // Leave group mutation
+  const leaveGroupMutation = useMutation({
+    mutationFn: async (groupId: string) => {
+      if (!user) throw new Error('Not authenticated');
+      return groupChatsService.leaveGroupChat(groupId, user.id);
+    },
+    onMutate: async (groupId) => {
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEY] });
+      const previousData = queryClient.getQueryData([QUERY_KEY, user?.id]);
+      return { previousData };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success('Left the group');
+    },
+    onError: (error, _, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData([QUERY_KEY, user?.id], context.previousData);
       }
+      handleError(error, 'Leaving group');
+    },
+  });
 
-      const groupIds = memberships.map(m => m.group_id);
-
-      // Fetch group details with pagination
-      const { data: groups, error: groupError } = await supabase
-        .from('group_chats')
-        .select('*')
-        .in('id', groupIds)
-        .order('updated_at', { ascending: false })
-        .range(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE - 1);
-
-      if (groupError) throw groupError;
-
-      const groupsList = groups || [];
-      setHasMore(groupsList.length === PAGE_SIZE);
-
-      // Fetch member counts for each group
-      const groupsWithMembers: GroupChatWithMembers[] = await Promise.all(
-        groupsList.map(async (group) => {
-          const { count } = await supabase
-            .from('group_chat_members')
-            .select('*', { count: 'exact', head: true })
-            .eq('group_id', group.id);
-
-          return {
-            ...group,
-            members: [],
-            member_count: count || 0,
-          };
-        })
-      );
-
-      if (reset) {
-        setGroupChats(groupsWithMembers);
-        setPage(1);
-      } else {
-        setGroupChats(prev => [...prev, ...groupsWithMembers]);
-        setPage(currentPage + 1);
+  // Delete group mutation
+  const deleteGroupMutation = useMutation({
+    mutationFn: groupChatsService.deleteGroupChat,
+    onMutate: async (groupId) => {
+      await queryClient.cancelQueries({ queryKey: [QUERY_KEY] });
+      const previousData = queryClient.getQueryData([QUERY_KEY, user?.id]);
+      return { previousData };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success('Group deleted');
+    },
+    onError: (error, _, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData([QUERY_KEY, user?.id], context.previousData);
       }
-    } catch (error) {
-      handleError(error, 'Fetching group chats');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, page]);
+      handleError(error, 'Deleting group');
+    },
+  });
 
-  useEffect(() => {
-    fetchGroupChats(true);
-  }, [user]);
+  // Invite member mutation
+  const inviteMemberMutation = useMutation({
+    mutationFn: async ({ groupId, username }: { groupId: string; username: string }) => {
+      const result = await groupChatsService.inviteMember(groupId, username);
+      if (!result) {
+        throw new Error('User not found. Check the username.');
+      }
+      return result;
+    },
+    onSuccess: () => {
+      toast.success('Member invited successfully!');
+    },
+    onError: (error) => {
+      handleError(error, 'Inviting member', { showToast: true });
+    },
+  });
 
-  const loadMore = useCallback(async () => {
-    if (hasMore && !isLoading) {
-      await fetchGroupChats(false);
-    }
-  }, [hasMore, isLoading, fetchGroupChats]);
-
-  const createGroupChat = async (name: string, description?: string) => {
+  // Helper functions
+  const createGroupChat = useCallback(async (name: string, description?: string) => {
     if (!user) {
       toast.error('You must be logged in to create a group');
       return null;
     }
-
     try {
-      // Create the group
-      const { data: group, error: groupError } = await supabase
-        .from('group_chats')
-        .insert({
-          name,
-          description,
-          created_by: user.id,
-        })
-        .select()
-        .single();
-
-      if (groupError) throw groupError;
-
-      // Add creator as admin
-      const { error: memberError } = await supabase
-        .from('group_chat_members')
-        .insert({
-          group_id: group.id,
-          user_id: user.id,
-          role: 'admin',
-        });
-
-      if (memberError) throw memberError;
-
-      toast.success('Group created successfully!');
-      await fetchGroupChats(true);
-      return group;
-    } catch (error) {
-      handleError(error, 'Creating group');
+      return await createGroupChatMutation.mutateAsync({ name, description });
+    } catch {
       return null;
     }
-  };
+  }, [user, createGroupChatMutation]);
 
-  const inviteMember = async (groupId: string, identifier: string) => {
-    if (!user) return { error: 'Not authenticated' };
-
-    // Validate and sanitize input
+  const inviteMember = useCallback(async (groupId: string, identifier: string) => {
     const sanitizedIdentifier = identifier.trim();
     if (!sanitizedIdentifier || sanitizedIdentifier.length > 255) {
-      return { error: 'Invalid username or email' };
+      return { error: 'Invalid username' };
     }
-
     try {
-      // Find user by username only (email is no longer stored in profiles for privacy)
-      let targetUser: { id: string; username: string | null } | null = null;
-      
-      const { data: userByUsername, error: usernameError } = await supabase
-        .from('profiles')
-        .select('id, username')
-        .eq('username', sanitizedIdentifier)
-        .maybeSingle();
-
-      if (usernameError) throw usernameError;
-      
-      if (userByUsername) {
-        targetUser = userByUsername;
-      }
-
-      if (!targetUser) {
-        return { error: 'User not found. Check the username or email.' };
-      }
-
-      // Check if already a member
-      const { data: existing } = await supabase
-        .from('group_chat_members')
-        .select('id')
-        .eq('group_id', groupId)
-        .eq('user_id', targetUser.id)
-        .maybeSingle();
-
-      if (existing) {
-        return { error: 'User is already a member of this group' };
-      }
-
-      // Add as member
-      const { error: addError } = await supabase
-        .from('group_chat_members')
-        .insert({
-          group_id: groupId,
-          user_id: targetUser.id,
-          role: 'member',
-        });
-
-      if (addError) throw addError;
-
-      toast.success('Member invited successfully!');
+      await inviteMemberMutation.mutateAsync({ groupId, username: sanitizedIdentifier });
       return { error: null };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to invite member';
-      handleError(error, 'Inviting member', { showToast: false });
-      return { error: errorMessage };
-    }
-  };
-
-  const leaveGroup = async (groupId: string) => {
-    if (!user) return;
-
-    // Optimistic update
-    const originalGroup = groupChats.find(g => g.id === groupId);
-    setGroupChats(prev => prev.filter(g => g.id !== groupId));
-
-    try {
-      const { error } = await supabase
-        .from('group_chat_members')
-        .delete()
-        .eq('group_id', groupId)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast.success('Left the group');
     } catch (error) {
-      // Rollback on failure
-      if (originalGroup) {
-        setGroupChats(prev => [originalGroup, ...prev]);
-      }
-      handleError(error, 'Leaving group');
+      return { error: error instanceof Error ? error.message : 'Failed to invite member' };
     }
-  };
+  }, [inviteMemberMutation]);
 
-  const deleteGroup = async (groupId: string) => {
-    if (!user) return;
+  const leaveGroup = useCallback((groupId: string) => {
+    leaveGroupMutation.mutate(groupId);
+  }, [leaveGroupMutation]);
 
-    // Optimistic update
-    const originalGroup = groupChats.find(g => g.id === groupId);
-    setGroupChats(prev => prev.filter(g => g.id !== groupId));
+  const deleteGroup = useCallback((groupId: string) => {
+    deleteGroupMutation.mutate(groupId);
+  }, [deleteGroupMutation]);
 
-    try {
-      const { error } = await supabase
-        .from('group_chats')
-        .delete()
-        .eq('id', groupId);
-
-      if (error) throw error;
-
-      toast.success('Group deleted');
-    } catch (error) {
-      // Rollback on failure
-      if (originalGroup) {
-        setGroupChats(prev => [originalGroup, ...prev]);
-      }
-      handleError(error, 'Deleting group');
+  const loadMore = useCallback(async () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      await fetchNextPage();
     }
-  };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return {
     groupChats,
     isLoading,
-    hasMore,
+    hasMore: hasNextPage ?? false,
     createGroupChat,
     inviteMember,
     leaveGroup,
     deleteGroup,
     loadMore,
-    refreshGroupChats: () => fetchGroupChats(true),
+    refreshGroupChats: () => queryClient.invalidateQueries({ queryKey: [QUERY_KEY] }),
   };
 };
 

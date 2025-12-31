@@ -7,3 +7,6 @@
 export * as conversationsService from './conversations';
 export * as agentsService from './agents';
 export * as promptsService from './prompts';
+export * as spacesService from './spaces';
+export * as groupChatsService from './groupChats';
+export * as studioGenerationsService from './studioGenerations';
