@@ -18,6 +18,9 @@ export { useLongPress } from './useLongPress';
 export { useNavOrder } from './useNavOrder';
 export { useApiKeys } from './useApiKeys';
 export { usePrompts } from './usePrompts';
+export { useUser } from './useUser';
+export { useAuthActions } from './useAuthActions';
+export { useSidebarDrag } from './useSidebarDrag';
 
 // Re-export types for convenience
 export type { Conversation, Space, Message, ChatMode, ChatAttachment, ChatOptions, UploadedFile } from '@/types';
