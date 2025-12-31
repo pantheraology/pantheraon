@@ -10,11 +10,14 @@ interface GenerationCardProps {
 }
 
 export const GenerationCard = ({ generation, onDelete, onView }: GenerationCardProps) => {
+  // Use signedUrl if available, fall back to result_url for legacy data
+  const imageUrl = generation.signedUrl || generation.result_url;
+
   const handleDownload = async () => {
-    if (!generation.result_url) return;
+    if (!imageUrl) return;
     
     try {
-      const response = await fetch(generation.result_url);
+      const response = await fetch(imageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -36,9 +39,9 @@ export const GenerationCard = ({ generation, onDelete, onView }: GenerationCardP
         className="aspect-square bg-muted cursor-pointer"
         onClick={onView}
       >
-        {generation.result_url ? (
+        {imageUrl ? (
           <img
-            src={generation.result_url}
+            src={imageUrl}
             alt={generation.prompt}
             className="w-full h-full object-cover transition-transform group-hover:scale-105"
             loading="lazy"

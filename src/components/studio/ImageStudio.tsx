@@ -141,9 +141,10 @@ export const ImageStudio = () => {
           user_id: user.id,
           type: 'image',
           prompt: prompt.trim(),
-          result_url: data.imageUrl,
+          result_url: data.filePath || '', // Store the file path
           settings: { aspectRatio },
           created_at: new Date().toISOString(),
+          signedUrl: data.imageUrl, // Use the signed URL for immediate display
         });
       }
 
@@ -284,7 +285,7 @@ export const ImageStudio = () => {
                 generation={generation}
                 onDelete={() => deleteGeneration(generation.id)}
                 onView={() => setPreviewImage({ 
-                  url: generation.result_url || '', 
+                  url: generation.signedUrl || generation.result_url || '', 
                   prompt: generation.prompt 
                 })}
               />

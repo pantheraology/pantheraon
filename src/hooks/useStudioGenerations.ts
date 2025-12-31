@@ -11,9 +11,35 @@ export interface StudioGeneration {
   result_url: string | null;
   settings: Record<string, any>;
   created_at: string;
+  // Runtime signed URL (not stored in DB)
+  signedUrl?: string;
 }
 
 const PAGE_SIZE = 30;
+const SIGNED_URL_EXPIRY = 3600; // 1 hour
+
+/**
+ * Generate a signed URL for a storage file path
+ */
+export const getSignedUrl = async (filePath: string): Promise<string | null> => {
+  if (!filePath) return null;
+  
+  // If it's already a full URL (legacy data), return as-is
+  if (filePath.startsWith('http')) {
+    return filePath;
+  }
+  
+  const { data, error } = await supabase.storage
+    .from('studio-assets')
+    .createSignedUrl(filePath, SIGNED_URL_EXPIRY);
+  
+  if (error) {
+    console.error('Error creating signed URL:', error);
+    return null;
+  }
+  
+  return data?.signedUrl || null;
+};
 
 export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
   const { user } = useAuth();
@@ -21,6 +47,19 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
+
+  // Generate signed URLs for generations
+  const enrichWithSignedUrls = useCallback(async (gens: StudioGeneration[]): Promise<StudioGeneration[]> => {
+    return Promise.all(
+      gens.map(async (gen) => {
+        if (gen.result_url) {
+          const signedUrl = await getSignedUrl(gen.result_url);
+          return { ...gen, signedUrl: signedUrl || gen.result_url };
+        }
+        return gen;
+      })
+    );
+  }, []);
 
   const fetchGenerations = useCallback(async (reset: boolean = true) => {
     if (!user) {
@@ -50,11 +89,14 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
       const generationsList = (data as StudioGeneration[]) || [];
       setHasMore(generationsList.length === PAGE_SIZE);
       
+      // Enrich with signed URLs
+      const enrichedGenerations = await enrichWithSignedUrls(generationsList);
+      
       if (reset) {
-        setGenerations(generationsList);
+        setGenerations(enrichedGenerations);
         setPage(1);
       } else {
-        setGenerations(prev => [...prev, ...generationsList]);
+        setGenerations(prev => [...prev, ...enrichedGenerations]);
         setPage(currentPage + 1);
       }
     } catch (error) {
@@ -63,7 +105,7 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, type, page]);
+  }, [user, type, page, enrichWithSignedUrls]);
 
   useEffect(() => {
     fetchGenerations(true);
@@ -83,11 +125,14 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
     setGenerations(prev => prev.filter(g => g.id !== id));
 
     try {
-      // Delete from storage if we have the URL
+      // Delete from storage if we have the file path
       if (generation?.result_url) {
-        const urlParts = generation.result_url.split('/studio-assets/');
-        if (urlParts.length > 1) {
-          const filePath = urlParts[1];
+        // result_url now stores file path, not full URL
+        const filePath = generation.result_url.startsWith('http')
+          ? generation.result_url.split('/studio-assets/')[1] // legacy format
+          : generation.result_url; // new format (just the path)
+        
+        if (filePath) {
           await supabase.storage.from('studio-assets').remove([filePath]);
         }
       }
@@ -112,8 +157,14 @@ export const useStudioGenerations = (type?: 'image' | 'video' | 'audio') => {
     }
   };
 
-  const addGeneration = (generation: StudioGeneration) => {
-    setGenerations(prev => [generation, ...prev]);
+  const addGeneration = async (generation: StudioGeneration) => {
+    // If it has a result_url, get a signed URL for it
+    if (generation.result_url) {
+      const signedUrl = await getSignedUrl(generation.result_url);
+      setGenerations(prev => [{ ...generation, signedUrl: signedUrl || generation.result_url }, ...prev]);
+    } else {
+      setGenerations(prev => [generation, ...prev]);
+    }
   };
 
   return {
