@@ -90,16 +90,16 @@ const Index = () => {
   const hasMessages = messages.length > 0;
   
   return (
-    <div className="relative flex-1 h-screen flex flex-col">
+    <div className="relative flex-1 h-screen flex flex-col pb-20 md:pb-0">
       <HeaderWidget onNewThread={handleNewThread} />
 
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col items-center overflow-y-auto px-4 md:px-8">
         {!hasMessages ? (
           // Welcome State
-          <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[740px] gap-8 py-20">
-            <h1 className="text-4xl md:text-5xl font-light text-center text-foreground leading-tight drop-shadow-2xl animate-fade-in">
-              {greeting}{displayName ? `, ${displayName}` : ''} <br />
+          <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[740px] gap-6 py-12 px-2">
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-light text-center text-foreground leading-tight drop-shadow-2xl animate-fade-in break-words">
+              {greeting}{displayName ? `, ${displayName}` : ''}
             </h1>
 
             {rateLimitRetryAt && (
@@ -119,7 +119,7 @@ const Index = () => {
           </div>
         ) : (
           // Chat State
-          <div className="flex-1 flex flex-col w-full max-w-[740px] pt-20 pb-4">
+          <div className="flex-1 flex flex-col w-full max-w-[740px] pt-16 pb-4">
             <div className="flex-1 overflow-y-auto">
               <MessageList messages={messages} isLoading={isLoading} />
             </div>
@@ -133,7 +133,7 @@ const Index = () => {
               </div>
             )}
             
-            <div className="sticky bottom-0 pt-4 bg-gradient-to-t from-background via-background to-transparent">
+            <div className="sticky bottom-0 pt-4 bg-gradient-to-t from-background via-background to-transparent pb-2">
               <ChatInput 
                 onSend={handleSendMessage} 
                 isLoading={isLoading} 

@@ -291,13 +291,13 @@ export const ChatInput = ({ onSend, isLoading = false, placeholder = "Ask anythi
             </div>
 
             {/* Right side: Model Selector and Send */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* Model Selector */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors">
-                    {selectedModel.name}
-                    <ChevronDown size={14} />
+                  <button className="flex items-center gap-1 px-2 sm:px-3 py-1.5 h-8 rounded-lg text-xs sm:text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors max-w-[100px] sm:max-w-none">
+                    <span className="truncate">{selectedModel.name}</span>
+                    <ChevronDown size={14} className="shrink-0" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">

@@ -12,7 +12,7 @@ export const MobileMenuButton = ({ isOpen, onClick, className }: MobileMenuButto
     <button
       onClick={onClick}
       className={cn(
-        "md:hidden fixed top-4 left-4 z-50 w-10 h-10 rounded-lg glass flex items-center justify-center transition-all duration-200 hover:bg-muted",
+        "md:hidden fixed top-1/2 -translate-y-1/2 right-0 z-50 w-10 h-12 rounded-l-xl rounded-r-none glass flex items-center justify-center transition-all duration-200 hover:bg-muted shadow-lg",
         className
       )}
       aria-label={isOpen ? "Close menu" : "Open menu"}

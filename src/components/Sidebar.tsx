@@ -191,16 +191,16 @@ export const Sidebar = ({
       {/* Sidebar */}
       <div 
         className={cn(
-          "h-screen bg-sidebar flex flex-col justify-between py-6 px-4 fixed left-0 top-0 z-40 border-r border-border/50 transition-transform duration-300 ease-in-out",
+          "h-screen bg-sidebar flex flex-col py-6 px-4 fixed left-0 top-0 z-40 border-r border-border/50 transition-transform duration-300 ease-in-out pb-20 md:pb-6",
           isMobile && !isOpen && "-translate-x-full",
           isMobile && isOpen && "translate-x-0"
         )} 
         style={{ width: SIDEBAR_WIDTH }}
       >
-        {/* Top Section */}
-        <div className="flex flex-col gap-6">
+        {/* Top Section - Scrollable */}
+        <div className="flex flex-col gap-6 flex-1 overflow-y-auto min-h-0">
           {/* Brand */}
-          <div className="flex items-center gap-3 px-2">
+          <div className="flex items-center gap-3 px-2 shrink-0">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-b from-primary/80 via-primary to-primary/60 shadow-[0_0_38px_hsl(var(--primary)/0.45)] flex items-center justify-center text-foreground font-bold">
               P
             </div>
@@ -209,7 +209,7 @@ export const Sidebar = ({
 
           {/* Edit Mode Header */}
           {isEditMode && (
-            <div className="flex items-center justify-between px-2 py-2 bg-primary/10 rounded-lg border border-primary/20 animate-fade-in">
+            <div className="flex items-center justify-between px-2 py-2 bg-primary/10 rounded-lg border border-primary/20 animate-fade-in shrink-0">
               <span className="text-sm text-primary font-medium">Drag to reorder</span>
               <button
                 onClick={() => setIsEditMode(false)}
@@ -291,14 +291,14 @@ export const Sidebar = ({
           
           {/* Long press hint */}
           {!isEditMode && (
-            <p className="text-[10px] text-muted-foreground/50 text-center px-2">
+            <p className="text-[10px] text-muted-foreground/50 text-center px-2 shrink-0">
               Hold item 2s to reorder
             </p>
           )}
         </div>
 
-        {/* Bottom Section */}
-        <div className="flex-col gap-4 flex items-center justify-start">
+        {/* Bottom Section - Fixed at bottom */}
+        <div className="flex-col gap-4 flex items-center justify-start pt-4 border-t border-border/30 mt-4 shrink-0 pb-safe">
           {/* Auth Buttons or User Menu */}
           {isLoading ? (
             <div className="animate-pulse space-y-3">
