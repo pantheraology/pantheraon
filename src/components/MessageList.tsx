@@ -19,41 +19,43 @@ export const MessageList = ({ messages, isLoading }: MessageListProps) => {
   if (messages.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-3xl mx-auto py-6 scrollbar-thin">
+    <div className="flex flex-col gap-3 md:gap-4 w-full py-4 md:py-6">
       {messages.map((message, index) => (
         <div
           key={message.id}
           className={cn(
-            "flex gap-4 animate-fade-in",
+            "flex gap-2 md:gap-3 animate-fade-in",
             message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
           )}
-          style={{ animationDelay: `${index * 0.05}s` }}
+          style={{ animationDelay: `${index * 0.03}s` }}
         >
-          {/* Avatar */}
+          {/* Avatar - smaller on mobile */}
           <div className={cn(
-            "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+            "w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center flex-shrink-0",
             message.role === 'user' 
               ? "bg-primary/20 text-primary" 
               : "bg-gradient-to-br from-primary to-accent text-primary-foreground"
           )}>
             {message.role === 'user' ? (
-              <User size={16} />
+              <User size={14} className="md:w-4 md:h-4" />
             ) : (
-              <Sparkles size={16} />
+              <Sparkles size={14} className="md:w-4 md:h-4" />
             )}
           </div>
 
-          {/* Message Content */}
+          {/* Message Content - chat bubble style */}
           <div className={cn(
-            "flex-1 rounded-2xl px-4 py-3 max-w-[85%]",
+            "rounded-2xl px-3 py-2 md:px-4 md:py-3 max-w-[80%]",
             message.role === 'user' 
-              ? "bg-primary/10 text-foreground ml-auto" 
-              : "glass text-foreground"
+              ? "bg-primary text-primary-foreground" 
+              : "bg-muted/80 text-foreground"
           )}>
             {message.role === 'user' ? (
-              <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+              <p className="whitespace-pre-wrap leading-relaxed text-sm md:text-base">{message.content}</p>
             ) : (
-              <MarkdownRenderer content={message.content} />
+              <div className="text-sm md:text-base">
+                <MarkdownRenderer content={message.content} />
+              </div>
             )}
           </div>
         </div>
@@ -61,15 +63,15 @@ export const MessageList = ({ messages, isLoading }: MessageListProps) => {
 
       {/* Loading indicator */}
       {isLoading && (
-        <div className="flex gap-4 animate-fade-in">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
-            <Sparkles size={16} className="text-primary-foreground animate-pulse" />
+        <div className="flex gap-2 md:gap-3 animate-fade-in">
+          <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center flex-shrink-0">
+            <Sparkles size={14} className="md:w-4 md:h-4 text-primary-foreground animate-pulse" />
           </div>
-          <div className="glass rounded-2xl px-4 py-3">
-            <div className="flex gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className="bg-muted/80 rounded-2xl px-3 py-2 md:px-4 md:py-3">
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         </div>
