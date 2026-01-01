@@ -1,15 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
-import { MessageSquare, Compass, Users, Bot, Library, Plus } from 'lucide-react';
+import { Package, Sparkles, Users, Bot, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerHaptic } from '@/hooks/useDeviceCapability';
 
 const navItems = [
-  { icon: MessageSquare, label: 'Chat', path: '/' },
-  { icon: Compass, label: 'Discover', path: '/discover' },
+  { icon: Package, label: 'Inventory', path: '/library', requiresAuth: true },
+  { icon: Sparkles, label: 'Assistants', path: '/assistants', requiresAuth: true },
   { icon: Users, label: 'Groups', path: '/groups', requiresAuth: true },
   { icon: Bot, label: 'Agent', path: '/agent', requiresAuth: true },
-  { icon: Library, label: 'Library', path: '/library', requiresAuth: true },
 ];
 
 interface BottomNavigationProps {
