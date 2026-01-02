@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { deleteAccount as deleteAccountService } from '@/services/auth';
 
 interface Profile {
   id: string;
@@ -164,26 +164,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to delete account');
-      }
-
-      // Sign out locally after successful deletion
-      await supabase.auth.signOut();
+      await deleteAccountService(session.access_token);
       setProfile(null);
-      
       return { error: null };
     } catch (error) {
       console.error('Delete account error:', error);

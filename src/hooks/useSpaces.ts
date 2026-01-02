@@ -1,58 +1,85 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { Space } from '@/types';
+import {
+  fetchSpaces,
+  createSpace as createSpaceService,
+  deleteSpace as deleteSpaceService,
+} from '@/services/spaces';
 
-interface DbSpace {
-  id: string;
-  user_id: string;
-  name: string;
-  icon: string | null;
-  created_at: string;
-  updated_at: string;
-}
+const SPACES_QUERY_KEY = ['spaces'];
 
 export const useSpaces = () => {
   const { user } = useAuth();
-  const [spaces, setSpaces] = useState<Space[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  // Fetch spaces from database
-  const fetchSpaces = useCallback(async () => {
-    if (!user) {
-      setSpaces([]);
-      setIsLoading(false);
-      return;
-    }
+  // Fetch spaces with React Query
+  const {
+    data: spacesData,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: SPACES_QUERY_KEY,
+    queryFn: async () => {
+      if (!user) return { data: [], hasMore: false };
+      return fetchSpaces(user.id);
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
-    try {
-      const { data, error } = await supabase
-        .from('spaces')
-        .select('*')
-        .order('created_at', { ascending: false });
+  const spaces = spacesData?.data ?? [];
 
-      if (error) throw error;
+  // Create space mutation
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      if (!user) throw new Error('Not authenticated');
+      return createSpaceService(user.id, name);
+    },
+    onSuccess: (newSpace) => {
+      queryClient.setQueryData(SPACES_QUERY_KEY, (old: { data: Space[]; hasMore: boolean } | undefined) => ({
+        data: [newSpace, ...(old?.data ?? [])],
+        hasMore: old?.hasMore ?? false,
+      }));
+    },
+    onError: (error) => {
+      console.error('Failed to create space:', error);
+      toast.error('Failed to create space');
+    },
+  });
 
-      const parsedSpaces: Space[] = (data as DbSpace[]).map((s) => ({
-        id: s.id,
-        name: s.name,
-        icon: s.icon,
-        createdAt: new Date(s.created_at),
+  // Delete space mutation
+  const deleteMutation = useMutation({
+    mutationFn: deleteSpaceService,
+    onMutate: async (spaceId) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: SPACES_QUERY_KEY });
+
+      // Snapshot the previous value
+      const previousSpaces = queryClient.getQueryData(SPACES_QUERY_KEY);
+
+      // Optimistically update
+      queryClient.setQueryData(SPACES_QUERY_KEY, (old: { data: Space[]; hasMore: boolean } | undefined) => ({
+        data: (old?.data ?? []).filter((s) => s.id !== spaceId),
+        hasMore: old?.hasMore ?? false,
       }));
 
-      setSpaces(parsedSpaces);
-    } catch (error) {
-      console.error('Failed to fetch spaces:', error);
-      toast.error('Failed to load spaces');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchSpaces();
-  }, [fetchSpaces]);
+      return { previousSpaces };
+    },
+    onError: (error, _spaceId, context) => {
+      // Rollback on error
+      if (context?.previousSpaces) {
+        queryClient.setQueryData(SPACES_QUERY_KEY, context.previousSpaces);
+      }
+      console.error('Failed to delete space:', error);
+      toast.error('Failed to delete space');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: SPACES_QUERY_KEY });
+    },
+  });
 
   const createSpace = useCallback(async (name: string): Promise<Space | null> => {
     if (!user) {
@@ -61,47 +88,16 @@ export const useSpaces = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('spaces')
-        .insert({ name, user_id: user.id })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      const newSpace: Space = {
-        id: data.id,
-        name: data.name,
-        icon: data.icon,
-        createdAt: new Date(data.created_at),
-      };
-
-      setSpaces((prev) => [newSpace, ...prev]);
-      return newSpace;
-    } catch (error) {
-      console.error('Failed to create space:', error);
-      toast.error('Failed to create space');
+      return await createMutation.mutateAsync(name);
+    } catch {
       return null;
     }
-  }, [user]);
+  }, [user, createMutation]);
 
   const deleteSpace = useCallback(async (id: string) => {
     if (!user) return;
-
-    try {
-      const { error } = await supabase
-        .from('spaces')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      setSpaces((prev) => prev.filter((s) => s.id !== id));
-    } catch (error) {
-      console.error('Failed to delete space:', error);
-      toast.error('Failed to delete space');
-    }
-  }, [user]);
+    await deleteMutation.mutateAsync(id);
+  }, [user, deleteMutation]);
 
   const getSpace = useCallback((id: string): Space | undefined => {
     return spaces.find((s) => s.id === id);
@@ -113,6 +109,6 @@ export const useSpaces = () => {
     createSpace,
     deleteSpace,
     getSpace,
-    refetch: fetchSpaces,
+    refetch,
   };
 };
